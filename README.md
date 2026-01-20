@@ -38,7 +38,13 @@ This repository uses an **App Pack** architecture. It provides specialized "Flav
 
 ### Installation
 
-1.  **Run the Interactive Installer**:
+1.  **One-Line Install (Recommended)**:
+    ```bash
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/Puget-Systems/puget-docker-app-pack/main/setup.sh)"
+    ```
+
+2.  **Manual Install**:
+    Clone this repository and run:
     ```bash
     ./install.sh
     ```

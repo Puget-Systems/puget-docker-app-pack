@@ -37,9 +37,12 @@ echo "Different flavors are optimized for different use cases:"
 echo "--------------------------------------------------------"
 
 # Dynamically list packs
-PACKS_DIR="./packs"
+# Resolve the directory where this script resides to find the packs
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+PACKS_DIR="$SCRIPT_DIR/packs"
+
 if [ ! -d "$PACKS_DIR" ]; then
-   echo -e "${RED}Error: 'packs' directory not found! Run this script from the repo root.${NC}"
+   echo -e "${RED}Error: 'packs' directory not found at $PACKS_DIR!${NC}"
    exit 1
 fi
 

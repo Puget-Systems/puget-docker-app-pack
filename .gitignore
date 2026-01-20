@@ -1,0 +1,13 @@
+# System
+.DS_Store
+Thumbs.db
+
+# Generated Apps (Do not commit user deployments inside the repo)
+my-puget-app/
+my-old-app/
+test-deploy/
+
+# Temporary
+tmp/
+*.log
+.env

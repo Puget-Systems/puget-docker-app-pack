@@ -1,0 +1,37 @@
+services:
+  # Service 1: The Swarm Brain (Agents)
+  swarm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: puget_swarm_brain
+    depends_on:
+      - inference
+    volumes:
+      - ./src:/home/puget-app-pack/app/src
+    environment:
+      - OLLAMA_HOST=http://inference:11434
+      - AUTOGEN_USE_DOCKER=False # We are already in docker
+
+  # Service 2: The Inference Engine (Ollama)
+  # Default: CPU Only (compatible with Mac/Consumer).
+  # To enable GPU, uncomment 'deploy' section or use overrides.
+  inference:
+    image: ollama/ollama:latest
+    container_name: puget_inference_engine
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./ollama_data:/root/.ollama
+    # Deploy section for GPU support (Universal / Mac Metal handles this implicitly often, but for NVIDIA:)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+networks:
+  default:
+    name: puget_swarm_net

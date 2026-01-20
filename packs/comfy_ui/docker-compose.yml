@@ -1,0 +1,38 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: puget_comfy_ui
+    restart: unless-stopped
+    
+    # Enable NVIDIA GPU
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    # Standard Ports
+    ports:
+      - "8188:8188"
+
+    # Volume Mounts for Persistence
+    volumes:
+      # Mount models from host (avoid downloading 10GB+ every rebuild)
+      # User must populate ./models locally
+      - ./models:/home/puget-app-pack/app/models
+      
+      # Mount outputs for easy access
+      - ./output:/home/puget-app-pack/app/output
+      
+      # Mount input for workflows
+      - ./input:/home/puget-app-pack/app/input
+      
+      # Persistence for Custom Nodes (Manager, etc.)
+      - ./custom_nodes:/home/puget-app-pack/app/custom_nodes
+
+    environment:
+      - CLI_ARGS=--listen 0.0.0.0 --preview-method auto

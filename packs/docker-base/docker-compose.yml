@@ -1,0 +1,23 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: puget_base_app
+    
+    # Keep the container running for interactive development
+    # Matches the patterns from Puget Supercompute Demo
+    command: tail -f /dev/null
+    
+    # Mount local source code to the container's standard path
+    volumes:
+      - ./src:/home/puget-app-pack/app/src
+    
+    # Hardware Integration (Uncomment to enable GPU)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]

@@ -14,6 +14,47 @@ echo -e "${BLUE}============================================================${NC
 echo -e "${BLUE}   Puget Systems Docker App Pack - Universal Installer${NC}"
 echo -e "${BLUE}============================================================${NC}"
 
+# 0. Prerequisite Checks
+echo -e "\n${YELLOW}[Preflight] Checking dependencies...${NC}"
+
+MISSING_DEPS=0
+
+# Check for Docker
+if ! command -v docker &> /dev/null; then
+    echo -e "${RED}✗ Docker is not installed.${NC}"
+    echo "  Install with: sudo apt install docker.io docker-compose-v2"
+    MISSING_DEPS=1
+else
+    echo -e "${GREEN}✓ Docker found.${NC}"
+fi
+
+# Check for NVIDIA Container Toolkit (required for GPU access)
+if ! command -v nvidia-container-toolkit &> /dev/null && ! dpkg -l nvidia-container-toolkit &> /dev/null 2>&1; then
+    echo -e "${RED}✗ NVIDIA Container Toolkit is not installed.${NC}"
+    echo "  This is required for GPU passthrough to containers."
+    echo "  Install guide: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html"
+    echo "  Quick install:"
+    echo "    curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg"
+    echo "    curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \\"
+    echo "      sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \\"
+    echo "      sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list"
+    echo "    sudo apt update && sudo apt install -y nvidia-container-toolkit"
+    echo "    sudo nvidia-ctk runtime configure --runtime=docker"
+    echo "    sudo systemctl restart docker"
+    MISSING_DEPS=1
+else
+    echo -e "${GREEN}✓ NVIDIA Container Toolkit found.${NC}"
+fi
+
+if [ $MISSING_DEPS -eq 1 ]; then
+    echo ""
+    read -p "Dependencies missing. Continue anyway? (y/N): " CONTINUE
+    if [[ "$CONTINUE" != "y" && "$CONTINUE" != "Y" ]]; then
+        echo "Installation aborted. Please install missing dependencies first."
+        exit 1
+    fi
+fi
+
 # 1. Directory Setup
 DEFAULT_DIR="my-puget-app"
 echo -e "\n${YELLOW}[Step 1] Configuration${NC}"

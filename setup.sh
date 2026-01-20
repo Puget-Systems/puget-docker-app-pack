@@ -1,7 +1,8 @@
-#!/bin/bash
+#!/bin/sh
 
 # Puget Systems App Pack - One-Line Bootstrap Installer
 # This script downloads the latest installer logic and runs it.
+# Dependencies: curl OR wget (no git required)
 
 # ANSI Color Codes
 GREEN='\033[0;32m'
@@ -9,47 +10,51 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-REPO_URL="https://github.com/Puget-Systems/puget-docker-app-pack.git"
-BRANCH="main"
-
-echo -e "${BLUE}============================================================${NC}"
-echo -e "${BLUE}   Puget Systems Docker App Pack - Bootstrap Installer${NC}"
-echo -e "${BLUE}============================================================${NC}"
-
-# 1. Dependency Check
-if ! command -v git &> /dev/null; then
-    echo -e "${RED}Error: 'git' is not installed. Please install git and try again.${NC}"
-    exit 1
-fi
-
-# 2. Setup Temporary Environment
-TEMP_DIR=$(mktemp -d)
+REPO_URL="https://github.com/Puget-Systems/puget-docker-app-pack/archive/refs/heads/main.tar.gz"
 PROJECT_NAME="puget-docker-app-pack"
 
+echo "${BLUE}============================================================${NC}"
+echo "${BLUE}   Puget Systems Docker App Pack - Bootstrap Installer${NC}"
+echo "${BLUE}============================================================${NC}"
+
+# 1. Setup Temporary Environment
+TEMP_DIR=$(mktemp -d)
+
 cleanup() {
-    # echo -e "\n${BLUE}Cleaning up temporary files...${NC}"
     rm -rf "$TEMP_DIR"
 }
 trap cleanup EXIT
 
-echo -e "\n${BLUE}Fetching latest install scripts from GitHub...${NC}"
+echo ""
+echo "${BLUE}Fetching latest install scripts...${NC}"
 
-# 3. Clone Repository (Shallow clone for speed)
-if git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$TEMP_DIR/$PROJECT_NAME" &> /dev/null; then
-    echo -e "${GREEN}Assets acquired.${NC}"
+# 2. Download and Extract (curl or wget)
+ARCHIVE_PATH="$TEMP_DIR/pack.tar.gz"
+
+if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$REPO_URL" -o "$ARCHIVE_PATH"
+elif command -v wget >/dev/null 2>&1; then
+    wget -q "$REPO_URL" -O "$ARCHIVE_PATH"
 else
-    echo -e "${RED}Error: Failed to download repository.${NC}"
+    echo "${RED}Error: Neither 'curl' nor 'wget' found. Please install one.${NC}"
     exit 1
 fi
 
+if [ ! -f "$ARCHIVE_PATH" ]; then
+    echo "${RED}Error: Failed to download repository archive.${NC}"
+    exit 1
+fi
+
+# 3. Extract Archive
+tar -xzf "$ARCHIVE_PATH" -C "$TEMP_DIR"
+echo "${GREEN}Assets acquired.${NC}"
+
 # 4. Handover to Main Installer
-# We execute the installer from the temp directory, but we pass the CURRENT directory
-# as context if needed, though the interactive script handles CWD.
-INSTALLER_PATH="$TEMP_DIR/$PROJECT_NAME/install.sh"
+# GitHub archives extract to <repo>-<branch>/ directory
+INSTALLER_PATH="$TEMP_DIR/${PROJECT_NAME}-main/install.sh"
 chmod +x "$INSTALLER_PATH"
 
-echo -e "${BLUE}Launching Installer...${NC}"
+echo "${BLUE}Launching Installer...${NC}"
 "$INSTALLER_PATH"
 
-# Exit code of the installer will be returned by this script
 exit $?

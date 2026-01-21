@@ -151,19 +151,19 @@ case $FLAVOR in
         echo "ComfyUI requires AI models to generate images."
         echo ""
         echo "To download a starter model (SDXL, ~6GB):"
-        echo "  ${GREEN}wget -P $INSTALL_DIR/models/checkpoints/ https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors${NC}"
+        echo -e "  ${GREEN}wget -P $INSTALL_DIR/models/checkpoints/ https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors${NC}"
         echo ""
         echo "Or for a lightweight test (SD 1.5, ~2GB):"
-        echo "  ${GREEN}wget -P $INSTALL_DIR/models/checkpoints/ https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors${NC}"
+        echo -e "  ${GREEN}wget -P $INSTALL_DIR/models/checkpoints/ https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors${NC}"
         echo ""
-        echo "After starting, access ComfyUI at: ${BLUE}http://localhost:8188${NC}"
+        echo -e "After starting, access ComfyUI at: ${BLUE}http://localhost:8188${NC}"
         ;;
     office_inference)
         echo "Office Inference uses Ollama for local AI."
         echo ""
         echo "After starting, pull a model:"
-        echo "  ${GREEN}docker exec -it puget_ollama ollama pull llama3.2${NC}"
-        echo "  ${GREEN}docker exec -it puget_ollama ollama pull codellama${NC}"
+        echo -e "  ${GREEN}docker exec -it puget_ollama ollama pull llama3.2${NC}"
+        echo -e "  ${GREEN}docker exec -it puget_ollama ollama pull codellama${NC}"
         echo ""
         echo "AutoGen will connect to Ollama at http://ollama:11434"
         ;;
@@ -178,5 +178,5 @@ esac
 
 echo -e "\n${YELLOW}[Next Steps]${NC}"
 echo "  1. cd $INSTALL_DIR"
-echo "  2. ${GREEN}docker compose up --build${NC}"
+echo -e "  2. ${GREEN}docker compose up --build${NC}"
 echo "  3. Start developing in 'src/'"

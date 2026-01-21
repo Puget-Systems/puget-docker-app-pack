@@ -32,17 +32,21 @@ else
 fi
 
 # Docker Group Warning (critical for Ubuntu)
-echo -e "${YELLOW}⚠ IMPORTANT (Ubuntu users):${NC}"
-echo "  Docker commands require 'sudo' unless your user is in the 'docker' group."
-echo "  If you haven't already, run: ${GREEN}sudo usermod -aG docker \$USER${NC}"
-echo "  Then LOG OUT and back in for changes to take effect."
+echo ""
+echo -e "${YELLOW}════════════════════════════════════════════════════════════${NC}"
+echo -e "${YELLOW}⚠ IMPORTANT (Ubuntu/Debian users):${NC}"
+echo -e "  Docker commands require ${RED}sudo${NC} unless your user is in the 'docker' group."
+echo -e "  If you haven't already, run: ${GREEN}sudo usermod -aG docker \$USER${NC}"
+echo -e "  Then ${RED}LOG OUT${NC} and back in for changes to take effect."
+echo -e "${YELLOW}════════════════════════════════════════════════════════════${NC}"
+echo ""
 
 # Check for NVIDIA Drivers (required for GPU stacks)
 if ! command -v nvidia-smi &> /dev/null; then
     echo -e "${RED}✗ NVIDIA drivers not detected.${NC}"
     echo "  GPU-accelerated stacks (ComfyUI, Office Inference) require NVIDIA drivers 550+."
     echo "  Install from: https://www.nvidia.com/Download/index.aspx"
-    echo "  Or on Ubuntu: ${GREEN}sudo apt install nvidia-driver-550${NC}"
+    echo -e "  Or on Ubuntu: ${GREEN}sudo apt install nvidia-driver-550${NC}"
 else
     DRIVER_VERSION=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1)
     echo -e "${GREEN}✓ NVIDIA Driver found: $DRIVER_VERSION${NC}"

@@ -45,8 +45,20 @@ echo ""
 if ! command -v nvidia-smi &> /dev/null; then
     echo -e "${RED}✗ NVIDIA drivers not detected.${NC}"
     echo "  GPU-accelerated stacks (ComfyUI, Office Inference) require NVIDIA drivers 550+."
-    echo "  Install from: https://www.nvidia.com/Download/index.aspx"
-    echo -e "  Or on Ubuntu: ${GREEN}sudo apt install nvidia-driver-550${NC}"
+    
+    # Offer automated installation
+    read -p "  Would you like to install the NVIDIA drivers (550) now? (Y/n): " INSTALL_DRIVERS
+    if [[ "$INSTALL_DRIVERS" != "n" && "$INSTALL_DRIVERS" != "N" ]]; then
+        echo -e "${BLUE}Installing NVIDIA drivers (550)...${NC}"
+        sudo apt update && sudo apt install -y nvidia-driver-550
+        
+        echo -e "${YELLOW}⚠ IMPORTANT: Drivers installed.${NC}"
+        echo -e "${YELLOW}  You MUST REBOOT your system before the GPU will be available.${NC}"
+        echo "  Please reboot and run this installer again."
+        exit 0
+    else
+        echo "  Skipping driver installation. GPU containers may fail to start."
+    fi
 else
     DRIVER_VERSION=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1)
     echo -e "${GREEN}✓ NVIDIA Driver found: $DRIVER_VERSION${NC}"

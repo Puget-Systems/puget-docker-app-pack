@@ -34,6 +34,29 @@ This repository uses an **App Pack** architecture. It provides specialized "Flav
 
 ---
 
+## Prerequisites
+
+### Docker
+- **Required for all stacks**
+- Ubuntu: `sudo apt install docker.io docker-compose-v2`
+- **⚠️ Important**: Docker requires `sudo` unless your user is in the `docker` group:
+  ```bash
+  sudo usermod -aG docker $USER
+  # Then LOG OUT and back in!
+  ```
+
+### NVIDIA Drivers (GPU Stacks)
+- **Required for**: ComfyUI, Office Inference
+- **Minimum Version**: 550+
+- Ubuntu: `sudo apt install nvidia-driver-550`
+- Verify: `nvidia-smi`
+
+### NVIDIA Container Toolkit (GPU Stacks)
+- The installer will offer to install this automatically
+- Manual: [NVIDIA Container Toolkit Install Guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+
+---
+
 ## Quick Start
 
 ### Installation

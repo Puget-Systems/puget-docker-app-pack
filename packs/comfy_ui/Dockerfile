@@ -33,8 +33,9 @@ RUN git clone https://github.com/comfyanonymous/ComfyUI.git .
 RUN pip3 install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Create standard data directories for volume mounting
-RUN mkdir models output input temp
+# Ensure standard data directories exist for volume mounting
+# Using -p for idempotent creation (some may exist from git clone)
+RUN mkdir -p models output input temp custom_nodes
 
 # Fix permissions
 RUN chown -R puget-app-pack:puget-app-pack /home/puget-app-pack

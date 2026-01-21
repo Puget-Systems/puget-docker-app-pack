@@ -25,10 +25,27 @@ if ! command -v docker &> /dev/null; then
         echo -e "${BLUE}Installing Docker...${NC}"
         sudo apt update && sudo apt install -y docker.io docker-compose-v2
         sudo usermod -aG docker $USER
-        echo -e "${GREEN}✓ Docker installed. You may need to log out and back in for group changes.${NC}"
+        echo -e "${GREEN}✓ Docker installed.${NC}"
     fi
 else
     echo -e "${GREEN}✓ Docker found.${NC}"
+fi
+
+# Docker Group Warning (critical for Ubuntu)
+echo -e "${YELLOW}⚠ IMPORTANT (Ubuntu users):${NC}"
+echo "  Docker commands require 'sudo' unless your user is in the 'docker' group."
+echo "  If you haven't already, run: ${GREEN}sudo usermod -aG docker \$USER${NC}"
+echo "  Then LOG OUT and back in for changes to take effect."
+
+# Check for NVIDIA Drivers (required for GPU stacks)
+if ! command -v nvidia-smi &> /dev/null; then
+    echo -e "${RED}✗ NVIDIA drivers not detected.${NC}"
+    echo "  GPU-accelerated stacks (ComfyUI, Office Inference) require NVIDIA drivers 550+."
+    echo "  Install from: https://www.nvidia.com/Download/index.aspx"
+    echo "  Or on Ubuntu: ${GREEN}sudo apt install nvidia-driver-550${NC}"
+else
+    DRIVER_VERSION=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1)
+    echo -e "${GREEN}✓ NVIDIA Driver found: $DRIVER_VERSION${NC}"
 fi
 
 # Check for NVIDIA Container Toolkit (required for GPU access)
@@ -126,7 +143,40 @@ if [ ! -f "$INSTALL_DIR/.env" ]; then
 fi
 
 echo -e "${GREEN}Success! Application installed to '$INSTALL_DIR'.${NC}"
-echo -e "\nNext Steps:"
+
+# Per-Flavor Post-Install Guidance
+echo -e "\n${YELLOW}[Post-Install: $FLAVOR]${NC}"
+case $FLAVOR in
+    comfy_ui)
+        echo "ComfyUI requires AI models to generate images."
+        echo ""
+        echo "To download a starter model (SDXL, ~6GB):"
+        echo "  ${GREEN}wget -P $INSTALL_DIR/models/checkpoints/ https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors${NC}"
+        echo ""
+        echo "Or for a lightweight test (SD 1.5, ~2GB):"
+        echo "  ${GREEN}wget -P $INSTALL_DIR/models/checkpoints/ https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors${NC}"
+        echo ""
+        echo "After starting, access ComfyUI at: ${BLUE}http://localhost:8188${NC}"
+        ;;
+    office_inference)
+        echo "Office Inference uses Ollama for local AI."
+        echo ""
+        echo "After starting, pull a model:"
+        echo "  ${GREEN}docker exec -it puget_ollama ollama pull llama3.2${NC}"
+        echo "  ${GREEN}docker exec -it puget_ollama ollama pull codellama${NC}"
+        echo ""
+        echo "AutoGen will connect to Ollama at http://ollama:11434"
+        ;;
+    docker-base)
+        echo "Base environment ready for Python development."
+        echo "Edit files in '$INSTALL_DIR/src/' and rebuild."
+        ;;
+    *)
+        echo "Stack ready. Edit files in '$INSTALL_DIR/src/' and rebuild."
+        ;;
+esac
+
+echo -e "\n${YELLOW}[Next Steps]${NC}"
 echo "  1. cd $INSTALL_DIR"
-echo "  2. docker compose up --build"
+echo "  2. ${GREEN}docker compose up --build${NC}"
 echo "  3. Start developing in 'src/'"

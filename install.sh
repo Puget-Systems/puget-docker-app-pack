@@ -42,8 +42,9 @@ echo -e "${YELLOW}════════════════════�
 echo ""
 
 # Check for NVIDIA Drivers (required for GPU stacks)
-if ! command -v nvidia-smi &> /dev/null; then
-    echo -e "${RED}✗ NVIDIA drivers not detected.${NC}"
+# We check if nvidia-smi exists AND returns success (0)
+if ! command -v nvidia-smi &> /dev/null || ! nvidia-smi &> /dev/null; then
+    echo -e "${RED}✗ NVIDIA drivers not detected (or not active).${NC}"
     echo "  GPU-accelerated stacks (ComfyUI, Office Inference) require NVIDIA drivers 550+."
     
     # Offer automated installation

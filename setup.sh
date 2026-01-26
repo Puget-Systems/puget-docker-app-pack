@@ -10,12 +10,15 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-REPO_URL="https://github.com/Puget-Systems/puget-docker-app-pack/archive/refs/heads/main.tar.gz"
+# Default to main if not specified
+BRANCH=${BRANCH:-main}
+REPO_URL="https://github.com/Puget-Systems/puget-docker-app-pack/archive/refs/heads/$BRANCH.tar.gz"
 PROJECT_NAME="puget-docker-app-pack"
 
-echo "${BLUE}============================================================${NC}"
-echo "${BLUE}   Puget Systems Docker App Pack - Bootstrap Installer${NC}"
-echo "${BLUE}============================================================${NC}"
+echo -e "${BLUE}============================================================${NC}"
+echo -e "${BLUE}   Puget Systems Docker App Pack - Bootstrap Installer${NC}"
+echo -e "${BLUE}============================================================${NC}"
+echo -e "${BLUE}   Branch: ${GREEN}$BRANCH${NC}"
 
 # 1. Setup Temporary Environment
 TEMP_DIR=$(mktemp -d)
@@ -26,7 +29,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo ""
-echo "${BLUE}Fetching latest install scripts...${NC}"
+echo -e "${BLUE}Fetching latest install scripts...${NC}"
 
 # 2. Download and Extract (curl or wget)
 ARCHIVE_PATH="$TEMP_DIR/pack.tar.gz"
@@ -36,25 +39,27 @@ if command -v curl >/dev/null 2>&1; then
 elif command -v wget >/dev/null 2>&1; then
     wget -q "$REPO_URL" -O "$ARCHIVE_PATH"
 else
-    echo "${RED}Error: Neither 'curl' nor 'wget' found. Please install one.${NC}"
+    echo -e "${RED}Error: Neither 'curl' nor 'wget' found. Please install one.${NC}"
     exit 1
 fi
 
 if [ ! -f "$ARCHIVE_PATH" ]; then
-    echo "${RED}Error: Failed to download repository archive.${NC}"
+    echo -e "${RED}Error: Failed to download repository archive.${NC}"
     exit 1
 fi
 
 # 3. Extract Archive
 tar -xzf "$ARCHIVE_PATH" -C "$TEMP_DIR"
-echo "${GREEN}Assets acquired.${NC}"
+echo -e "${GREEN}Assets acquired.${NC}"
 
 # 4. Handover to Main Installer
 # GitHub archives extract to <repo>-<branch>/ directory
-INSTALLER_PATH="$TEMP_DIR/${PROJECT_NAME}-main/install.sh"
+# Note: GitHub sanitizes branch names in archives (e.g. feature/foo -> feature-foo)
+# For simple branches (main, develop) this is 1:1.
+INSTALLER_PATH="$TEMP_DIR/${PROJECT_NAME}-${BRANCH}/install.sh"
 chmod +x "$INSTALLER_PATH"
 
-echo "${BLUE}Launching Installer...${NC}"
+echo -e "${BLUE}Launching Installer...${NC}"
 "$INSTALLER_PATH"
 
 exit $?

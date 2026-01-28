@@ -149,29 +149,8 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# 1. Directory Setup
-DEFAULT_DIR="my-puget-app"
-echo -e "\n${YELLOW}[Step 1] Configuration${NC}"
-read -p "Enter installation directory name [${DEFAULT_DIR}]: " INSTALL_DIR
-INSTALL_DIR=${INSTALL_DIR:-$DEFAULT_DIR}
+# --- Configuration ---
 
-if [ -d "$INSTALL_DIR" ]; then
-    echo -e "${RED}Warning: Directory '$INSTALL_DIR' already exists.${NC}"
-    read -p "Continue and potentially overwrite files? (y/N): " CONFIRM
-    if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
-        echo "Installation aborted."
-        exit 1
-    fi
-else
-    mkdir -p "$INSTALL_DIR"
-fi
-
-# 2. Flavor Selection
-echo -e "\n${YELLOW}[Step 2] Select Application Flavor${NC}"
-echo "Different flavors are optimized for different use cases:"
-echo "--------------------------------------------------------"
-
-# Dynamically list packs
 # Resolve the directory where this script resides to find the packs
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PACKS_DIR="$SCRIPT_DIR/packs"
@@ -188,6 +167,11 @@ if [ ${#OPTIONS[@]} -eq 0 ]; then
     exit 1
 fi
 
+# 1. Flavor Selection
+echo -e "\n${YELLOW}[Step 1] Select Application Flavor${NC}"
+echo "Different flavors are optimized for different use cases:"
+echo "--------------------------------------------------------"
+
 PS3="Select a flavor (enter number): "
 select FLAVOR in "${OPTIONS[@]}"; do
     if [ -n "$FLAVOR" ]; then
@@ -197,6 +181,23 @@ select FLAVOR in "${OPTIONS[@]}"; do
         echo "Invalid selection. Please try again."
     fi
 done
+
+# 2. Directory Setup
+DEFAULT_DIR="${FLAVOR:-my-puget-app}"
+echo -e "\n${YELLOW}[Step 2] Configuration${NC}"
+read -p "Enter installation directory name [${DEFAULT_DIR}]: " INSTALL_DIR
+INSTALL_DIR=${INSTALL_DIR:-$DEFAULT_DIR}
+
+if [ -d "$INSTALL_DIR" ]; then
+    echo -e "${RED}Warning: Directory '$INSTALL_DIR' already exists.${NC}"
+    read -p "Continue and potentially overwrite files? (y/N): " CONFIRM
+    if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
+        echo "Installation aborted."
+        exit 1
+    fi
+else
+    mkdir -p "$INSTALL_DIR"
+fi
 
 # 3. Feature Selection (Placeholder for Phase 2)
 # Future: Read 'features.json' from pack and prompt for mixins

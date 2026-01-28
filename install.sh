@@ -147,6 +147,16 @@ if command -v nvidia-ctk &> /dev/null && command -v docker &> /dev/null; then
         echo -e "${BLUE}Configuring Docker for NVIDIA GPU access...${NC}"
         sudo nvidia-ctk runtime configure --runtime=docker
         sudo systemctl restart docker
+        
+        # Wait for Docker to restart
+        echo "Waiting for Docker to restart..."
+        for i in {1..10}; do
+            if docker info &> /dev/null; then
+                break
+            fi
+            sleep 1
+        done
+        
         echo -e "${GREEN}✓ Docker GPU runtime configured.${NC}"
     fi
 fi

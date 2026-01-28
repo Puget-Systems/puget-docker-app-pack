@@ -134,12 +134,21 @@ if ! dpkg -l nvidia-container-toolkit &> /dev/null 2>&1; then
             sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
             sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
         sudo apt update && sudo apt install -y nvidia-container-toolkit
-        sudo nvidia-ctk runtime configure --runtime=docker
-        sudo systemctl restart docker
         echo -e "${GREEN}✓ NVIDIA Container Toolkit installed.${NC}"
     fi
 else
     echo -e "${GREEN}✓ NVIDIA Container Toolkit found.${NC}"
+fi
+
+# ALWAYS ensure Docker runtime is configured for NVIDIA (even if toolkit was pre-installed)
+if command -v nvidia-ctk &> /dev/null && command -v docker &> /dev/null; then
+    # Check if nvidia runtime is configured in Docker
+    if ! docker info 2>/dev/null | grep -q "nvidia"; then
+        echo -e "${BLUE}Configuring Docker for NVIDIA GPU access...${NC}"
+        sudo nvidia-ctk runtime configure --runtime=docker
+        sudo systemctl restart docker
+        echo -e "${GREEN}✓ Docker GPU runtime configured.${NC}"
+    fi
 fi
 
 # Re-check after potential installs

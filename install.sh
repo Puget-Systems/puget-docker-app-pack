@@ -22,10 +22,35 @@ if ! command -v docker &> /dev/null; then
     echo -e "${RED}✗ Docker is not installed.${NC}"
     read -p "  Would you like to install Docker now? (Y/n): " INSTALL_DOCKER
     if [[ "$INSTALL_DOCKER" != "n" && "$INSTALL_DOCKER" != "N" ]]; then
-        echo -e "${BLUE}Installing Docker...${NC}"
-        sudo apt update && sudo apt install -y docker.io docker-compose-v2
+        echo -e "${BLUE}Installing Docker (Official Docker CE)...${NC}"
+        
+        # 1. Remove any old/conflicting packages
+        sudo apt remove -y docker.io docker-doc docker-compose podman-docker containerd runc 2>/dev/null || true
+        
+        # 2. Install prerequisites
+        sudo apt update
+        sudo apt install -y ca-certificates curl gnupg
+        
+        # 3. Add Docker's official GPG key
+        sudo install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        sudo chmod a+r /etc/apt/keyrings/docker.gpg
+        
+        # 4. Add the Docker repository
+        echo \
+          "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+          $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+          sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        
+        # 5. Install Docker Engine + Compose Plugin
+        sudo apt update
+        sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        
+        # 6. Add user to docker group
         sudo usermod -aG docker $USER
+        
         echo -e "${GREEN}✓ Docker installed.${NC}"
+        echo -e "${YELLOW}  Note: You may need to log out and back in for docker group changes.${NC}"
     fi
 else
     echo -e "${GREEN}✓ Docker found.${NC}"

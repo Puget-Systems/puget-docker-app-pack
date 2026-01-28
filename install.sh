@@ -56,6 +56,37 @@ else
     echo -e "${GREEN}✓ Docker found.${NC}"
 fi
 
+# Check for Docker Compose (required for all stacks)
+if ! docker compose version &> /dev/null; then
+    echo -e "${RED}✗ Docker Compose plugin is not installed.${NC}"
+    echo "  All stacks require 'docker compose' to run."
+    read -p "  Would you like to install Docker Compose plugin now? (Y/n): " INSTALL_COMPOSE
+    if [[ "$INSTALL_COMPOSE" != "n" && "$INSTALL_COMPOSE" != "N" ]]; then
+        echo -e "${BLUE}Installing Docker Compose plugin...${NC}"
+        
+        # Ensure Docker repo is configured
+        if [ ! -f /etc/apt/sources.list.d/docker.list ]; then
+            sudo install -m 0755 -d /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg 2>/dev/null || true
+            sudo chmod a+r /etc/apt/keyrings/docker.gpg
+            echo \
+              "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+              $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+              sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            sudo apt update
+        fi
+        
+        sudo apt install -y docker-compose-plugin
+        echo -e "${GREEN}✓ Docker Compose plugin installed.${NC}"
+    else
+        echo -e "${RED}Cannot continue without Docker Compose.${NC}"
+        exit 1
+    fi
+else
+    COMPOSE_VERSION=$(docker compose version --short 2>/dev/null || echo "unknown")
+    echo -e "${GREEN}✓ Docker Compose found: ${COMPOSE_VERSION}${NC}"
+fi
+
 # Docker Group Warning (critical for Ubuntu)
 echo ""
 echo -e "${YELLOW}════════════════════════════════════════════════════════════${NC}"

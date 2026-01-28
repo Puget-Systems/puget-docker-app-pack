@@ -223,11 +223,41 @@ case $FLAVOR in
     comfy_ui)
         echo "ComfyUI requires AI models to generate images."
         echo ""
-        echo "To download a starter model (SDXL, ~6GB):"
-        echo -e "  ${GREEN}wget -P $INSTALL_DIR/models/checkpoints/ https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors${NC}"
+        echo "Available starter models:"
+        echo "  1) SDXL Base 1.0 (~6GB) - Best quality, recommended"
+        echo "  2) SD 1.5 (~2GB) - Lightweight, good for testing"
+        echo "  3) Flux Schnell (~12GB) - Fast, high quality (requires more VRAM)"
+        echo "  4) Skip - I'll download models myself"
         echo ""
-        echo "Or for a lightweight test (SD 1.5, ~2GB):"
-        echo -e "  ${GREEN}wget -P $INSTALL_DIR/models/checkpoints/ https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors${NC}"
+        read -p "Select a model to download [1-4]: " MODEL_CHOICE
+        
+        case $MODEL_CHOICE in
+            1)
+                echo -e "${BLUE}Downloading SDXL Base 1.0...${NC}"
+                mkdir -p "$INSTALL_DIR/models/checkpoints"
+                wget -q --show-progress -P "$INSTALL_DIR/models/checkpoints/" \
+                    "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors"
+                echo -e "${GREEN}✓ SDXL model downloaded.${NC}"
+                ;;
+            2)
+                echo -e "${BLUE}Downloading SD 1.5...${NC}"
+                mkdir -p "$INSTALL_DIR/models/checkpoints"
+                wget -q --show-progress -P "$INSTALL_DIR/models/checkpoints/" \
+                    "https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors"
+                echo -e "${GREEN}✓ SD 1.5 model downloaded.${NC}"
+                ;;
+            3)
+                echo -e "${BLUE}Downloading Flux Schnell...${NC}"
+                mkdir -p "$INSTALL_DIR/models/checkpoints"
+                wget -q --show-progress -P "$INSTALL_DIR/models/checkpoints/" \
+                    "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/flux1-schnell.safetensors"
+                echo -e "${GREEN}✓ Flux Schnell model downloaded.${NC}"
+                ;;
+            *)
+                echo "Skipping model download."
+                echo -e "You can download models later to: ${BLUE}$INSTALL_DIR/models/checkpoints/${NC}"
+                ;;
+        esac
         echo ""
         echo -e "After starting, access ComfyUI at: ${BLUE}http://localhost:8188${NC}"
         ;;

@@ -303,9 +303,18 @@ if [[ "$START_NOW" != "n" && "$START_NOW" != "N" ]]; then
     
     # Specifically check for the comfy_ui conflict the user saw
     if [ "$FLAVOR" == "comfy_ui" ]; then
-        if docker ps -a --format '{{.Names}}' | grep -q "puget_comfy_ui"; then
-            echo -e "${YELLOW}Note: Removing existing container 'puget_comfy_ui' to avoid name conflict.${NC}"
-            docker rm -f puget_comfy_ui 2>/dev/null || true
+        if docker ps -a --format '{{.Names}}' | grep -q "^puget_comfy_ui$"; then
+            echo -e "${YELLOW}⚠ Conflict: A container named 'puget_comfy_ui' already exists.${NC}"
+            read -p "  Would you like to remove the existing container to continue? (y/N): " REMOVE_CONFLICT
+            if [[ "$REMOVE_CONFLICT" == "y" || "$REMOVE_CONFLICT" == "Y" ]]; then
+                echo -e "${BLUE}Removing existing container 'puget_comfy_ui'...${NC}"
+                docker rm -f puget_comfy_ui 2>/dev/null || true
+            else
+                echo -e "${RED}Error: Cannot launch because of name conflict.${NC}"
+                echo "Please stop/remove the existing container or choose a different installation name."
+                cd - > /dev/null
+                exit 1
+            fi
         fi
     fi
 

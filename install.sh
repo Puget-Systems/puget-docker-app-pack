@@ -249,7 +249,62 @@ case $FLAVOR in
         ;;
 esac
 
-echo -e "\n${YELLOW}[Next Steps]${NC}"
-echo "  1. cd $INSTALL_DIR"
-echo -e "  2. ${GREEN}docker compose up --build${NC}"
-echo "  3. Start developing in 'src/'"
+echo -e "\n${YELLOW}[Step 5] Launch${NC}"
+read -p "Would you like to build and start the container now? (Y/n): " START_NOW
+if [[ "$START_NOW" != "n" && "$START_NOW" != "N" ]]; then
+    echo -e "${BLUE}Building and starting container in background...${NC}"
+    cd "$INSTALL_DIR"
+    docker compose up --build -d
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Container started successfully!${NC}"
+        
+        # Show access URL based on flavor
+        case $FLAVOR in
+            comfy_ui)
+                LOCAL_IP=$(hostname -I | awk '{print $1}')
+                echo -e "\n${GREEN}Access ComfyUI at:${NC}"
+                echo -e "  Local:   ${BLUE}http://localhost:8188${NC}"
+                echo -e "  Network: ${BLUE}http://${LOCAL_IP}:8188${NC}"
+                ;;
+            office_inference)
+                echo -e "\n${GREEN}Ollama ready. Pull a model:${NC}"
+                echo -e "  ${BLUE}docker exec -it puget_ollama ollama pull llama3.2${NC}"
+                ;;
+        esac
+    else
+        echo -e "${RED}Container failed to start. Check logs with: docker compose logs${NC}"
+    fi
+    cd - > /dev/null
+fi
+
+# Offer auto-start on boot
+echo ""
+read -p "Would you like this container to start automatically on system boot? (Y/n): " AUTO_START
+if [[ "$AUTO_START" != "n" && "$AUTO_START" != "N" ]]; then
+    # Ensure Docker service starts on boot
+    sudo systemctl enable docker 2>/dev/null || true
+    
+    # The docker-compose.yml already has restart: unless-stopped
+    # But we need the container to exist, so start it if not running
+    cd "$INSTALL_DIR"
+    if ! docker compose ps --quiet 2>/dev/null | grep -q .; then
+        docker compose up -d
+    fi
+    cd - > /dev/null
+    
+    echo -e "${GREEN}✓ Auto-start configured.${NC}"
+    echo "  Container will restart automatically after reboot."
+    echo "  (Uses Docker's 'restart: unless-stopped' policy)"
+fi
+
+echo -e "\n${GREEN}════════════════════════════════════════════════════════════${NC}"
+echo -e "${GREEN}   Installation Complete!${NC}"
+echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}"
+echo ""
+echo "Useful commands:"
+echo -e "  ${BLUE}cd $INSTALL_DIR${NC}              - Go to installation"
+echo -e "  ${BLUE}docker compose logs -f${NC}      - View logs"
+echo -e "  ${BLUE}docker compose restart${NC}      - Restart container"
+echo -e "  ${BLUE}docker compose down${NC}         - Stop container"
+

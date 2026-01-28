@@ -294,6 +294,21 @@ read -p "Would you like to build and start the container now? (Y/n): " START_NOW
 if [[ "$START_NOW" != "n" && "$START_NOW" != "N" ]]; then
     echo -e "${BLUE}Building and starting container in background...${NC}"
     cd "$INSTALL_DIR"
+    
+    # Check for container name conflicts (since we use static names in some packs)
+    # We try to get the container name from docker-compose.yml if possible, or just handle the error
+    # Here we'll just attempt to stop and remove any existing container using the project's names
+    # or conflicting names we know about (like puget_comfy_ui)
+    docker compose down 2>/dev/null || true
+    
+    # Specifically check for the comfy_ui conflict the user saw
+    if [ "$FLAVOR" == "comfy_ui" ]; then
+        if docker ps -a --format '{{.Names}}' | grep -q "puget_comfy_ui"; then
+            echo -e "${YELLOW}Note: Removing existing container 'puget_comfy_ui' to avoid name conflict.${NC}"
+            docker rm -f puget_comfy_ui 2>/dev/null || true
+        fi
+    fi
+
     docker compose up --build -d
     
     if [ $? -eq 0 ]; then

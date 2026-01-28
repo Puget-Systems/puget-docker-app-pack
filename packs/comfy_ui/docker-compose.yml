@@ -15,6 +15,11 @@ services:
               count: all
               capabilities: [gpu]
 
+    # Increase limits for PyTorch
+    ulimits:
+      memlock: -1
+      stack: 67108864
+
     # Standard Ports
     ports:
       - "8188:8188"

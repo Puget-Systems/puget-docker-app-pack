@@ -56,6 +56,20 @@ else
     echo -e "${GREEN}✓ Docker found.${NC}"
 fi
 
+# Reload with docker group if needed
+if command -v docker &> /dev/null; then
+    if groups | grep -q "\bdocker\b"; then
+        # User is in group active session, good.
+        :
+    else
+        if id -nG "$USER" | grep -qw "docker"; then
+            echo -e "${YELLOW}User added to docker group but session not updated.${NC}"
+            echo -e "${BLUE}Reloading installer with group permissions...${NC}"
+            exec sg docker -c "$0 $@"
+        fi
+    fi
+fi
+
 # Check for Docker Compose (required for all stacks)
 if ! docker compose version &> /dev/null; then
     echo -e "${RED}✗ Docker Compose plugin is not installed.${NC}"
@@ -158,6 +172,15 @@ if command -v nvidia-ctk &> /dev/null && command -v docker &> /dev/null; then
         done
         
         echo -e "${GREEN}✓ Docker GPU runtime configured.${NC}"
+    fi
+
+    # Verify generic GPU access
+    echo "Verifying GPU access in Docker..."
+    if docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi &> /dev/null; then
+        echo -e "${GREEN}✓ GPU accessible from Docker.${NC}"
+    else
+        echo -e "${YELLOW}⚠ Warning: GPU check failed. Containers may not detect the GPU.${NC}"
+        echo -e "${YELLOW}  This might be due to a missing reboot or driver issue.${NC}"
     fi
 fi
 

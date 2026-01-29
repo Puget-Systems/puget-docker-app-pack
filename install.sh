@@ -319,13 +319,40 @@ case $FLAVOR in
         echo -e "After starting, access ComfyUI at: ${BLUE}http://localhost:8188${NC}"
         ;;
     office_inference)
-        echo "Office Inference uses Ollama for local AI."
+        echo -e "${GREEN}Office Inference Stack (Ollama + Open WebUI)${NC}"
+        echo "Ollama starts with no models downloaded. Select a starter model:"
         echo ""
-        echo "After starting, pull a model:"
-        echo -e "  ${GREEN}docker exec -it puget_ollama ollama pull llama3.2${NC}"
-        echo -e "  ${GREEN}docker exec -it puget_ollama ollama pull codellama${NC}"
+        echo "  1) Llama 3.2 (3B)   - Balanced, Fast, Low VRAM (Recommended)"
+        echo "  2) DeepSeek R1 (7B) - State-of-the-art Reasoning"
+        echo "  3) Qwen 2.5 (7B)    - Excellent for Coding & Math"
+        echo "  4) Skip             - I'll download models later"
         echo ""
-        echo "AutoGen will connect to Ollama at http://ollama:11434"
+        read -p "Select a model [1-4]: " MODEL_SELECT
+        
+        MODEL_TAG=""
+        case $MODEL_SELECT in
+            1) MODEL_TAG="llama3.2" ;;
+            2) MODEL_TAG="deepseek-r1" ;;
+            3) MODEL_TAG="qwen2.5" ;;
+            *) echo "Skipping model download." ;;
+        esac
+
+        if [[ -n "$MODEL_TAG" ]]; then
+             # Ensure stack is up first
+             if ! docker compose ps --quiet 2>/dev/null | grep -q .; then
+                 echo -e "${BLUE}Starting containers to pull model...${NC}"
+                 docker compose up -d
+                 echo "Waiting for Ollama to be ready..."
+                 sleep 5
+             fi
+             
+             echo -e "${BLUE}Downloading $MODEL_TAG... (This may take a moment)${NC}"
+             docker compose exec inference ollama pull "$MODEL_TAG"
+             echo -e "${GREEN}✓ Model ready.${NC}"
+             echo -e "Access Chat UI at: ${BLUE}http://localhost:3000${NC}"
+        else
+             echo -e "Run ${BLUE}./init.sh${NC} later to download models."
+        fi
         ;;
     docker-base)
         echo "Base environment ready for Python development."

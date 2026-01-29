@@ -265,6 +265,20 @@ echo -e "\n${YELLOW}[Post-Install: $FLAVOR]${NC}"
 case $FLAVOR in
     comfy_ui)
         echo "ComfyUI requires AI models to generate images."
+        
+        # Create required directories with write permissions
+        # This prevents Docker from creating them as root and ensures the container user can write
+        echo -e "${BLUE}Ensuring data directories exist and are writable...${NC}"
+        COMFY_DIRS=("models" "models/checkpoints" "output" "input" "temp" "custom_nodes")
+        for dir in "${COMFY_DIRS[@]}"; do
+            target="$INSTALL_DIR/$dir"
+            if [ ! -d "$target" ]; then
+                mkdir -p "$target"
+            fi
+            # Allow container user to write (since UID might not match host)
+            chmod 777 "$target"
+        done
+
         echo ""
         echo "Available starter models:"
         echo "  1) SDXL Base 1.0 (~6GB) - Best quality, recommended"

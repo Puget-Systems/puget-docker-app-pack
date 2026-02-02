@@ -280,35 +280,36 @@ case $FLAVOR in
         done
 
         echo ""
-        echo "Available starter models:"
-        echo "  1) SDXL Base 1.0 (~6GB) - Best quality, recommended"
-        echo "  2) SD 1.5 (~2GB) - Lightweight, good for testing"
-        echo "  3) Flux Schnell (~12GB) - Fast, high quality (requires more VRAM)"
-        echo "  4) Skip - I'll download models myself"
+        echo "Select a Creative Stack for your workflow:"
+        echo "  1) Pro Image  (Flux.1 Schnell ~12GB) - SOTA Image Generation"
+        echo "  2) Pro Video  (LTX-Video 2B   ~4GB)  - Best Open Source Video Model"
+        echo "  3) Standard   (SDXL Base 1.0  ~6GB)  - Reliable, Broad Compatibility"
+        echo "  4) Skip       - I'll download models myself"
         echo ""
-        read -p "Select a model to download [1-4]: " MODEL_CHOICE
+        read -p "Select a stack [1-4]: " STACK_CHOICE
         
-        case $MODEL_CHOICE in
+        case $STACK_CHOICE in
             1)
-                echo -e "${BLUE}Downloading SDXL Base 1.0...${NC}"
-                mkdir -p "$INSTALL_DIR/models/checkpoints"
-                wget -q --show-progress -P "$INSTALL_DIR/models/checkpoints/" \
-                    "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors"
-                echo -e "${GREEN}✓ SDXL model downloaded.${NC}"
-                ;;
-            2)
-                echo -e "${BLUE}Downloading SD 1.5...${NC}"
-                mkdir -p "$INSTALL_DIR/models/checkpoints"
-                wget -q --show-progress -P "$INSTALL_DIR/models/checkpoints/" \
-                    "https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors"
-                echo -e "${GREEN}✓ SD 1.5 model downloaded.${NC}"
-                ;;
-            3)
-                echo -e "${BLUE}Downloading Flux Schnell...${NC}"
+                echo -e "${BLUE}Downloading Flux.1 Schnell (Pro Image Stack)...${NC}"
                 mkdir -p "$INSTALL_DIR/models/checkpoints"
                 wget -q --show-progress -P "$INSTALL_DIR/models/checkpoints/" \
                     "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/flux1-schnell.safetensors"
-                echo -e "${GREEN}✓ Flux Schnell model downloaded.${NC}"
+                echo -e "${GREEN}✓ Flux.1 Schnell downloaded.${NC}"
+                ;;
+            2)
+                echo -e "${BLUE}Downloading LTX-Video 2B (Pro Video Stack)...${NC}"
+                mkdir -p "$INSTALL_DIR/models/checkpoints"
+                wget -q --show-progress -P "$INSTALL_DIR/models/checkpoints/" \
+                    "https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.5.safetensors"
+                echo -e "${GREEN}✓ LTX-Video downloaded.${NC}"
+                echo -e "${YELLOW}Note: You will need to install 'ComfyUI-LTXVideo' custom nodes via ComfyUI Manager.${NC}"
+                ;;
+            3)
+                echo -e "${BLUE}Downloading SDXL Base 1.0 (Standard Stack)...${NC}"
+                mkdir -p "$INSTALL_DIR/models/checkpoints"
+                wget -q --show-progress -P "$INSTALL_DIR/models/checkpoints/" \
+                    "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors"
+                echo -e "${GREEN}✓ SDXL Base 1.0 downloaded.${NC}"
                 ;;
             *)
                 echo "Skipping model download."

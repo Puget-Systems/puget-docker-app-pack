@@ -14,7 +14,22 @@ echo -e "${BLUE}============================================================${NC
 echo -e "${BLUE}   Puget Systems Docker App Pack - Universal Installer${NC}"
 echo -e "${BLUE}============================================================${NC}"
 
-# 0. Prerequisite Checks
+# 0. Distribution Compatibility Check
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    if [ "$ID" != "ubuntu" ]; then
+        echo -e "\n${RED}✗ Unsupported Linux distribution: ${ID:-unknown}${NC}"
+        echo -e "  The Puget Docker App Pack currently supports ${GREEN}Ubuntu${NC} only."
+        echo -e "  (Detected: $PRETTY_NAME)"
+        exit 1
+    fi
+else
+    echo -e "\n${RED}✗ Cannot detect Linux distribution (/etc/os-release not found).${NC}"
+    echo -e "  The Puget Docker App Pack requires ${GREEN}Ubuntu${NC}."
+    exit 1
+fi
+
+# 1. Prerequisite Checks
 echo -e "\n${YELLOW}[Preflight] Checking dependencies...${NC}"
 
 # Check for Docker
@@ -115,24 +130,79 @@ echo ""
 # We check if nvidia-smi exists AND returns success (0)
 if ! command -v nvidia-smi &> /dev/null || ! nvidia-smi &> /dev/null; then
     echo -e "${RED}✗ NVIDIA drivers not detected (or not active).${NC}"
-    echo "  GPU-accelerated stacks (ComfyUI, Office Inference) require NVIDIA drivers 550+."
+    echo "  GPU-accelerated stacks (ComfyUI, Office Inference) require NVIDIA drivers."
     
     # Offer automated installation
-    read -p "  Would you like to install the NVIDIA drivers (550) now? (Y/n): " INSTALL_DRIVERS
+    read -p "  Would you like to install the recommended NVIDIA drivers now? (Y/n): " INSTALL_DRIVERS
     if [[ "$INSTALL_DRIVERS" != "n" && "$INSTALL_DRIVERS" != "N" ]]; then
-        echo -e "${BLUE}Installing NVIDIA drivers (550)...${NC}"
-        sudo apt update && sudo apt install -y nvidia-driver-550
+        # Ensure ubuntu-drivers-common is available (pre-installed on Ubuntu, but verify)
+        if ! command -v ubuntu-drivers &> /dev/null; then
+            echo -e "${BLUE}Installing driver detection tools...${NC}"
+            sudo apt update && sudo apt install -y ubuntu-drivers-common
+        fi
         
-        echo -e "${YELLOW}⚠ IMPORTANT: Drivers installed.${NC}"
-        echo -e "${YELLOW}  You MUST REBOOT your system before the GPU will be available.${NC}"
-        echo "  Please reboot and run this installer again."
-        exit 0
+        # Show detected GPU and recommended driver
+        echo -e "${BLUE}Detecting GPU hardware...${NC}"
+        ubuntu-drivers devices 2>/dev/null || true
+        echo ""
+        
+        echo -e "${BLUE}Installing recommended NVIDIA drivers for your GPU...${NC}"
+        DRIVER_OUTPUT=$(sudo ubuntu-drivers install 2>&1)
+        DRIVER_EXIT=$?
+        echo "$DRIVER_OUTPUT"
+        
+        if [ $DRIVER_EXIT -ne 0 ]; then
+            echo -e "${RED}✗ Driver installation failed.${NC}"
+            echo "  You may need to install drivers manually."
+            echo "  Try: sudo apt update && sudo ubuntu-drivers install"
+            exit 1
+        fi
+        
+        # Check if anything was actually installed (vs already at newest version)
+        if echo "$DRIVER_OUTPUT" | grep -qE "(0 newly installed|already the newest version|No drivers found)"; then
+            # Drivers are already installed but nvidia-smi still fails.
+            # This is NOT a "just reboot" situation — something deeper is wrong.
+            echo ""
+            echo -e "${RED}════════════════════════════════════════════════════════════${NC}"
+            echo -e "${RED}⚠ NVIDIA drivers are installed but the GPU is not responding.${NC}"
+            echo -e "${RED}════════════════════════════════════════════════════════════${NC}"
+            echo ""
+            echo "  The driver package is already installed, but nvidia-smi cannot"
+            echo "  communicate with the GPU. Common causes:"
+            echo ""
+            echo -e "  1. ${YELLOW}Secure Boot${NC} is blocking the unsigned NVIDIA kernel module."
+            echo "     Check:  mokutil --sb-state"
+            echo "     Fix:    sudo mokutil --disable-validation  (then reboot)"
+            echo ""
+            echo -e "  2. ${YELLOW}Kernel module not loaded${NC} after a kernel update."
+            echo "     Check:  lsmod | grep nvidia"
+            echo "     Fix:    sudo modprobe nvidia"
+            echo ""
+            echo -e "  3. ${YELLOW}Kernel/driver version mismatch${NC} (new kernel, old DKMS build)."
+            echo "     Fix:    sudo ubuntu-drivers install"
+            echo "             sudo dkms autoinstall"
+            echo "             Then reboot."
+            echo ""
+            echo -e "  4. ${YELLOW}Wrong driver variant${NC} for your GPU generation."
+            echo "     Check:  ubuntu-drivers devices"
+            echo "     (Blackwell/RTX 50 series requires the '-open' kernel module variant)"
+            echo ""
+            echo "  Resolve the issue above and re-run this installer."
+            exit 1
+        else
+            # Drivers were freshly installed — reboot is genuinely needed
+            echo -e "${YELLOW}⚠ IMPORTANT: Drivers installed.${NC}"
+            echo -e "${YELLOW}  You MUST REBOOT your system before the GPU will be available.${NC}"
+            echo "  Please reboot and run this installer again."
+            exit 0
+        fi
     else
         echo "  Skipping driver installation. GPU containers may fail to start."
     fi
 else
     DRIVER_VERSION=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1)
-    echo -e "${GREEN}✓ NVIDIA Driver found: $DRIVER_VERSION${NC}"
+    GPU_NAME=$(nvidia-smi --query-gpu=gpu_name --format=csv,noheader | head -1)
+    echo -e "${GREEN}✓ NVIDIA Driver found: $DRIVER_VERSION ($GPU_NAME)${NC}"
 fi
 
 # Check for NVIDIA Container Toolkit (required for GPU access)
@@ -175,12 +245,13 @@ if command -v nvidia-ctk &> /dev/null && command -v docker &> /dev/null; then
     fi
 
     # Verify generic GPU access
-    echo "Verifying GPU access in Docker..."
-    if docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi &> /dev/null; then
+    echo "Verifying GPU access in Docker (this may pull an image)..."
+    if docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu24.04 nvidia-smi &> /dev/null; then
         echo -e "${GREEN}✓ GPU accessible from Docker.${NC}"
     else
-        echo -e "${YELLOW}⚠ Warning: GPU check failed. Containers may not detect the GPU.${NC}"
-        echo -e "${YELLOW}  This might be due to a missing reboot or driver issue.${NC}"
+        echo -e "${YELLOW}⚠ Warning: GPU verification check did not pass.${NC}"
+        echo -e "${YELLOW}  This is common immediately after driver/toolkit installation.${NC}"
+        echo -e "${YELLOW}  If containers fail to detect the GPU, try: sudo reboot${NC}"
     fi
 fi
 

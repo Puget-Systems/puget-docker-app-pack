@@ -246,7 +246,7 @@ if command -v nvidia-ctk &> /dev/null && command -v docker &> /dev/null; then
 
     # Verify generic GPU access
     echo "Verifying GPU access in Docker (this may pull an image)..."
-    if docker run --rm --gpus all nvidia/cuda:12.6.3-base-ubuntu24.04 nvidia-smi &> /dev/null; then
+    if docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi &> /dev/null; then
         echo -e "${GREEN}✓ GPU accessible from Docker.${NC}"
     else
         echo -e "${YELLOW}⚠ Warning: GPU verification check did not pass.${NC}"

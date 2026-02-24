@@ -1,6 +1,6 @@
 # Base Image: NVIDIA CUDA Runtime (Ubuntu 24.04 base)
 # CUDA 12.6 supports both Ada (RTX 4090, driver 550+) and Blackwell (RTX 5090, driver 560+)
-FROM nvidia/cuda:12.6.3-runtime-ubuntu24.04
+FROM nvidia/cuda:12.6.0-runtime-ubuntu24.04
 
 # Prevent interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive

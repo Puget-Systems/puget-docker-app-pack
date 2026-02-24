@@ -46,10 +46,10 @@ fi
 
 echo -e "\n=== GPU Container Test ==="
 echo "Attempting to run small nvidia/cuda container..."
-if docker run --rm --gpus all nvidia/cuda:12.6.3-base-ubuntu24.04 nvidia-smi &> /dev/null; then
+if docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi &> /dev/null; then
    echo -e "${GREEN}SUCCESS: Container can see GPU.${NC}"
 else
    echo -e "${RED}FAILURE: Container could not see GPU or failed to run.${NC}"
    echo "Error details:"
-   docker run --rm --gpus all nvidia/cuda:12.6.3-base-ubuntu24.04 nvidia-smi
+   docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi
 fi

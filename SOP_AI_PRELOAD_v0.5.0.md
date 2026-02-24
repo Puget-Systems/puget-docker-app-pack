@@ -46,7 +46,7 @@ Before the system is cleared for shipping, execute the following validations:
 ### 1. GPU Passthrough Verification
 Ensure the Docker daemon can successfully allocate GPUs to containers.
 ```bash
-docker run --rm --gpus all nvidia/cuda:12.6.3-base-ubuntu24.04 nvidia-smi
+docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi
 ```
 *Expected Result:* Displays the NVIDIA SMI table recognizing all installed GPUs inside the isolated container environment.
 

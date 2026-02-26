@@ -24,7 +24,7 @@ services:
   # 2. User Interface
   ui:
     image: ghcr.io/open-webui/open-webui:main
-    container_name: puget_openwebui
+    container_name: puget_personal_webui
     restart: unless-stopped
     ports:
       - "3000:8080"
@@ -40,7 +40,7 @@ services:
     build:
       context: brain
       dockerfile: Dockerfile
-    container_name: puget_brain
+    container_name: puget_personal_brain
     restart: unless-stopped
     volumes:
       # Mount source code for easy editing

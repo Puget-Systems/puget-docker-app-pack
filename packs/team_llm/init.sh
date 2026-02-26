@@ -134,6 +134,8 @@ if [[ "$START" != "n" && "$START" != "N" ]]; then
     echo ""
     
     CONTAINER_NAME="puget_vllm"
+    # Convert model ID to HF cache directory format (org/model -> models--org--model)
+    HF_CACHE_DIR="models--$(echo "$MODEL_ID" | sed 's|/|--|g')"
     READY=false
     
     while ! $READY; do
@@ -151,9 +153,9 @@ if [[ "$START" != "n" && "$START" != "N" ]]; then
             break
         fi
         
-        # Show download progress
-        CACHE_SIZE=$(docker exec "$CONTAINER_NAME" du -sm /root/.cache/huggingface/ 2>/dev/null | awk '{print $1}')
-        if [ -n "$CACHE_SIZE" ]; then
+        # Show download progress (scoped to this specific model)
+        CACHE_SIZE=$(docker exec "$CONTAINER_NAME" du -sm "/root/.cache/huggingface/hub/${HF_CACHE_DIR}/" 2>/dev/null | awk '{print $1}')
+        if [ -n "$CACHE_SIZE" ] && [ "$CACHE_SIZE" -gt 0 ] 2>/dev/null; then
             printf "\r  ⏳ Downloading model... %s MB cached" "$CACHE_SIZE"
         else
             printf "\r  ⏳ Initializing download..."

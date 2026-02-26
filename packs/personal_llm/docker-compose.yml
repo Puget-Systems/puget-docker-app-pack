@@ -13,6 +13,11 @@ services:
               capabilities: [gpu]
     ports:
       - "11434:11434"
+    environment:
+      # Optional: Route model downloads through Squid cache proxy
+      # Set CACHE_PROXY in .env (e.g. CACHE_PROXY=http://172.19.69.x:3128)
+      - HTTPS_PROXY=${CACHE_PROXY:-}
+      - HTTP_PROXY=${CACHE_PROXY:-}
     volumes:
       - ollama_data:/root/.ollama
 

@@ -36,7 +36,8 @@ This Standard Operating Procedure (SOP) defines the baseline software provisioni
 3. **Select Flavor:** 
    Select the appropriate App Pack based on the customer's sales order:
    - `comfy_ui`: Generative AI / Creative stacks
-   - `office_inference`: Swarm / Local LLM (Ollama/vLLM)
+   - `personal_llm`: Personal LLM (Ollama — single user, easy model swapping)
+   - `team_llm`: Team LLM (vLLM — multi-user, multi-GPU tensor parallelism)
    - `docker-base`: General data science
 
 ## Phase 3: Validation & Quality Control (QC)

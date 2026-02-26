@@ -1,0 +1,67 @@
+services:
+  # 1. Inference Engine (vLLM)
+  inference:
+    image: vllm/vllm-openai:latest
+    container_name: puget_vllm
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "8000:8000"
+    environment:
+      # Optional: Route model downloads through Squid cache proxy
+      - HTTPS_PROXY=${CACHE_PROXY:-}
+      - HTTP_PROXY=${CACHE_PROXY:-}
+      - HF_HOME=/root/.cache/huggingface
+    volumes:
+      - vllm_cache:/root/.cache/huggingface
+    ipc: host
+    command:
+      - --model=${MODEL_ID:-Qwen/Qwen3-32B}
+      - --tensor-parallel-size=${GPU_COUNT:-1}
+      - --max-model-len=${MAX_CONTEXT:-32768}
+      - --gpu-memory-utilization=0.90
+      - --dtype=auto
+      - --trust-remote-code
+
+  # 2. User Interface (Open WebUI)
+  ui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: puget_openwebui
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    environment:
+      # Connect to vLLM as an OpenAI-compatible backend
+      - OPENAI_API_BASE_URL=http://inference:8000/v1
+      - OPENAI_API_KEY=not-needed
+      - WEBUI_AUTH=false
+    volumes:
+      - open_webui_data:/app/backend/data
+    depends_on:
+      - inference
+
+  # 3. Swarm Brain (Optional/Advanced)
+  brain:
+    build:
+      context: brain
+      dockerfile: Dockerfile
+    container_name: puget_brain
+    restart: unless-stopped
+    volumes:
+      - ./src:/home/puget-app-pack/app
+    depends_on:
+      - inference
+    environment:
+      - OPENAI_API_BASE=http://inference:8000/v1
+      - OPENAI_API_KEY=not-needed
+    command: ["tail", "-f", "/dev/null"]
+
+volumes:
+  vllm_cache:
+  open_webui_data:

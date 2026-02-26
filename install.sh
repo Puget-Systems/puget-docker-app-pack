@@ -390,10 +390,35 @@ case $FLAVOR in
         echo ""
         echo -e "After starting, access ComfyUI at: ${BLUE}http://localhost:8188${NC}"
         ;;
-    office_inference)
-        echo -e "${GREEN}Office Inference Stack (Ollama + Open WebUI)${NC}"
+    personal_llm)
+        echo -e "${GREEN}Personal LLM (Ollama + Open WebUI)${NC}"
         echo "Note: You will be prompted to download models after the container launches."
         echo "      (Or use ./init.sh at any time)"
+        echo ""
+        # Cache Proxy Configuration (optional)
+        echo -e "${YELLOW}Cache Proxy (Optional):${NC}"
+        echo "  If this system is on a LAN with a Puget cache proxy (Squid),"
+        echo "  model downloads can be cached to avoid re-downloading."
+        read -p "  Enter cache proxy URL (or press Enter to skip): " CACHE_URL
+        if [ -n "$CACHE_URL" ]; then
+            echo "CACHE_PROXY=$CACHE_URL" >> "$INSTALL_DIR/.env"
+            echo -e "${GREEN}✓ Cache proxy configured: $CACHE_URL${NC}"
+        fi
+        ;;
+    team_llm)
+        echo -e "${GREEN}Team LLM (vLLM + Open WebUI)${NC}"
+        echo "Production inference with multi-GPU tensor parallelism."
+        echo "Run ./init.sh after launch to configure model and GPU settings."
+        echo ""
+        # Cache Proxy Configuration (optional)
+        echo -e "${YELLOW}Cache Proxy (Optional):${NC}"
+        echo "  If this system is on a LAN with a Puget cache proxy (Squid),"
+        echo "  model downloads can be cached to avoid re-downloading."
+        read -p "  Enter cache proxy URL (or press Enter to skip): " CACHE_URL
+        if [ -n "$CACHE_URL" ]; then
+            echo "CACHE_PROXY=$CACHE_URL" >> "$INSTALL_DIR/.env"
+            echo -e "${GREEN}✓ Cache proxy configured: $CACHE_URL${NC}"
+        fi
         ;;
     docker-base)
         echo "Base environment ready for Python development."
@@ -446,35 +471,46 @@ if [[ "$START_NOW" != "n" && "$START_NOW" != "N" ]]; then
                 echo -e "  Local:   ${BLUE}http://localhost:8188${NC}"
                 echo -e "  Network: ${BLUE}http://${LOCAL_IP}:8188${NC}"
                 ;;
-            office_inference)
+            personal_llm)
                 LOCAL_IP=$(hostname -I | awk '{print $1}')
                 echo -e "\n${GREEN}Access Open WebUI at:${NC}"
                 echo -e "  Local:   ${BLUE}http://localhost:3000${NC}"
                 echo -e "  Network: ${BLUE}http://${LOCAL_IP}:3000${NC}"
                 echo ""
                 echo "Select a starter model to download:"
-                echo "  1) Llama 3.2 (3B)   - Balanced, Fast, Low VRAM (Recommended)"
-                echo "  2) DeepSeek R1 (7B) - State-of-the-art Reasoning"
-                echo "  3) Qwen 2.5 (7B)    - Excellent for Coding & Math"
-                echo "  4) Skip             - I'll download models later"
+                echo "  1) Qwen 3 (8B)         - Fast, Low VRAM (~5 GB)"
+                echo "  2) Qwen 3 (32B)        - Best Quality, Single GPU (~20 GB) [Recommended]"
+                echo "  3) DeepSeek R1 (70B)   - Flagship Reasoning, Dual GPU (~42 GB)"
+                echo "  4) Llama 4 Scout       - Multimodal (text+image), Dual GPU (~63 GB)"
+                echo "  5) Skip                - I'll download models later"
                 echo ""
-                read -p "Select a model [1-4]: " MODEL_SELECT
+                read -p "Select a model [1-5]: " MODEL_SELECT
                 
                 MODEL_TAG=""
                 case $MODEL_SELECT in
-                    1) MODEL_TAG="llama3.2" ;;
-                    2) MODEL_TAG="deepseek-r1" ;;
-                    3) MODEL_TAG="qwen2.5" ;;
+                    1) MODEL_TAG="qwen3:8b" ;;
+                    2) MODEL_TAG="qwen3:32b" ;;
+                    3) MODEL_TAG="deepseek-r1:70b" ;;
+                    4) MODEL_TAG="llama4:scout" ;;
                     *) echo "Skipping model download." ;;
                 esac
 
                 if [[ -n "$MODEL_TAG" ]]; then
-                     echo -e "${BLUE}Downloading $MODEL_TAG... (This may take a moment)${NC}"
+                     echo -e "${BLUE}Downloading $MODEL_TAG... (This may take a while for larger models)${NC}"
                      docker compose exec inference ollama pull "$MODEL_TAG"
                      echo -e "${GREEN}✓ Model ready.${NC}"
                 else
                      echo -e "Run ${BLUE}./init.sh${NC} later to download models."
                 fi
+                ;;
+            team_llm)
+                LOCAL_IP=$(hostname -I | awk '{print $1}')
+                echo -e "\n${GREEN}vLLM server is starting...${NC}"
+                echo -e "  Chat UI:  ${BLUE}http://localhost:3000${NC}"
+                echo -e "  API:      ${BLUE}http://localhost:8000/v1${NC}"
+                echo -e "  Network:  ${BLUE}http://${LOCAL_IP}:3000${NC}"
+                echo ""
+                echo -e "Run ${BLUE}./init.sh${NC} to configure model and GPU settings."
                 ;;
         esac
     else

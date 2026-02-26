@@ -32,6 +32,8 @@ services:
       - --dtype=auto
       - --trust-remote-code
       - --disable-custom-all-reduce
+      - --enable-auto-tool-choice
+      - --tool-call-parser=hermes
 
   # 2. User Interface (Open WebUI)
   ui:

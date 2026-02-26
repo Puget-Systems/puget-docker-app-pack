@@ -17,6 +17,8 @@ services:
       # Optional: Route model downloads through Squid cache proxy
       - HTTPS_PROXY=${CACHE_PROXY:-}
       - HTTP_PROXY=${CACHE_PROXY:-}
+      - NO_PROXY=localhost,127.0.0.1,0.0.0.0
+      - no_proxy=localhost,127.0.0.1,0.0.0.0
       - HF_HOME=/root/.cache/huggingface
     volumes:
       - vllm_cache:/root/.cache/huggingface

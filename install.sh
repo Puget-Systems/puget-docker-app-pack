@@ -437,32 +437,38 @@ case $FLAVOR in
         # Model Selection
         echo -e "${YELLOW}Select a model to serve:${NC}"
         echo ""
-        echo "  1) Qwen 3 (8B)              - Fast, single GPU (~16 GB BF16)"
+        echo "  1) Qwen 3 (8B)                - Fast, single GPU (~16 GB BF16)"
 
         if [ "$TOTAL_VRAM" -ge 40 ]; then
-            echo "  2) Qwen 3 (32B FP8)         - Best quality, near-lossless (~32 GB) [Recommended]"
+            echo "  2) Qwen 3 (32B FP8)           - Near-lossless quality (~32 GB)"
         else
-            echo -e "  2) Qwen 3 (32B FP8)         - ${RED}Requires ~40 GB VRAM (you have ${TOTAL_VRAM} GB)${NC}"
+            echo -e "  2) Qwen 3 (32B FP8)           - ${RED}Requires ~40 GB VRAM${NC}"
+        fi
+
+        echo "  3) Qwen 3.5 (35B MoE AWQ)     - 3B active params, fast (~18 GB)"
+
+        if [ "$TOTAL_VRAM" -ge 80 ]; then
+            echo "  4) Qwen 3.5 (122B MoE AWQ)    - Flagship, 10B active (~60 GB) [Recommended]"
+        else
+            echo -e "  4) Qwen 3.5 (122B MoE AWQ)    - ${RED}Requires ~80 GB VRAM (you have ${TOTAL_VRAM} GB)${NC}"
         fi
 
         if [ "$TOTAL_VRAM" -ge 40 ]; then
-            if [ "$GPU_COUNT" -gt 1 ]; then
-                echo "  3) DeepSeek R1 (70B AWQ)    - Flagship reasoning, spans ${GPU_COUNT} GPUs (~38 GB)"
-            else
-                echo "  3) DeepSeek R1 (70B AWQ)    - Flagship reasoning (~38 GB quantized)"
-            fi
+            echo "  5) DeepSeek R1 (70B AWQ)      - Reasoning specialist (~38 GB)"
         else
-            echo -e "  3) DeepSeek R1 (70B AWQ)    - ${RED}Requires ~40 GB VRAM (you have ${TOTAL_VRAM} GB)${NC}"
+            echo -e "  5) DeepSeek R1 (70B AWQ)      - ${RED}Requires ~40 GB VRAM${NC}"
         fi
 
-        echo "  4) Skip                     - I'll configure via .env later"
+        echo "  6) Custom                      - Enter a HuggingFace model ID"
+        echo "  7) Skip                        - I'll configure via .env later"
         echo ""
-        read -p "Select [1-4]: " VLLM_MODEL_SELECT
+        read -p "Select [1-7]: " VLLM_MODEL_SELECT
         
         VLLM_MODEL_ID=""
         VLLM_GPU_COUNT=1
         VLLM_MODEL_SIZE_GB=0
         VLLM_TOOL_CALL_ARGS=""
+        VLLM_EXTRA_ARGS=""
         case $VLLM_MODEL_SELECT in
             1) VLLM_MODEL_ID="Qwen/Qwen3-8B"; VLLM_GPU_COUNT=1; VLLM_MODEL_SIZE_GB=16
                VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes" ;;
@@ -475,13 +481,29 @@ case $FLAVOR in
                 fi
                 ;;
             3)
+                VLLM_MODEL_ID="cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit"; VLLM_GPU_COUNT=1; VLLM_MODEL_SIZE_GB=18
+                VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes"
+                VLLM_EXTRA_ARGS="--quantization awq"
+                ;;
+            4)
+                if [ "$TOTAL_VRAM" -lt 80 ]; then
+                    echo -e "${RED}✗ Qwen 3.5 122B MoE AWQ requires ~80 GB VRAM (you have ${TOTAL_VRAM} GB).${NC}"
+                else
+                    VLLM_MODEL_ID="cyankiwi/Qwen3.5-122B-A10B-AWQ-4bit"; VLLM_GPU_COUNT=$GPU_COUNT; VLLM_MODEL_SIZE_GB=60
+                    VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes"
+                    VLLM_EXTRA_ARGS="--quantization awq"
+                fi
+                ;;
+            5)
                 if [ "$TOTAL_VRAM" -lt 40 ]; then
                     echo -e "${RED}✗ DeepSeek R1 70B AWQ requires ~40 GB VRAM (you have ${TOTAL_VRAM} GB).${NC}"
                 else
                     VLLM_MODEL_ID="Valdemardi/DeepSeek-R1-Distill-Llama-70B-AWQ"; VLLM_GPU_COUNT=$GPU_COUNT; VLLM_MODEL_SIZE_GB=38
                     VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes"
+                    VLLM_EXTRA_ARGS="--quantization awq"
                 fi
                 ;;
+            6) read -p "  Enter HuggingFace model ID: " VLLM_MODEL_ID ;;
             *) echo "Skipping model configuration. Edit .env before starting." ;;
         esac
         
@@ -510,7 +532,7 @@ case $FLAVOR in
             echo "GPU_COUNT=$VLLM_GPU_COUNT" >> "$INSTALL_DIR/.env"
             echo "MAX_CONTEXT=$MAX_CTX" >> "$INSTALL_DIR/.env"
             echo "GPU_MEMORY_UTILIZATION=$GPU_MEM_UTIL" >> "$INSTALL_DIR/.env"
-            echo "TOOL_CALL_ARGS=$VLLM_TOOL_CALL_ARGS" >> "$INSTALL_DIR/.env"
+            echo "TOOL_CALL_ARGS=$VLLM_TOOL_CALL_ARGS $VLLM_EXTRA_ARGS" >> "$INSTALL_DIR/.env"
             echo -e "${GREEN}✓ Model: $VLLM_MODEL_ID (${VLLM_GPU_COUNT} GPU(s))${NC}"
             echo -e "  Memory: ${GPU_MEM_UTIL} utilization, ${MAX_CTX} context tokens"
             echo -e "  Tool calls: enabled (hermes parser)"

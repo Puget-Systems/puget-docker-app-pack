@@ -48,31 +48,43 @@ echo ""
 echo "  Available models (based on ${TOTAL_VRAM} GB total VRAM):"
 echo ""
 
-# 1) Qwen 3 8B — always fits on any modern GPU
-echo "  1) Qwen 3 (8B)              - Fast, single GPU (~16 GB BF16)"
+# 1) Qwen 3 8B — always fits
+echo "  1) Qwen 3 (8B)                - Fast, single GPU (~16 GB BF16)"
 
-# 2) Qwen 3 32B FP8 — near-lossless quality, needs ~32 GB
+# 2) Qwen 3 32B FP8 — near-lossless, needs ~32 GB
 if [ "$TOTAL_VRAM" -ge 40 ]; then
-    echo "  2) Qwen 3 (32B FP8)         - Best quality, near-lossless (~32 GB) [Recommended]"
+    echo "  2) Qwen 3 (32B FP8)           - Near-lossless quality (~32 GB)"
 else
-    echo -e "  2) Qwen 3 (32B FP8)         - ${RED}Requires ~40 GB VRAM (you have ${TOTAL_VRAM} GB)${NC}"
+    echo -e "  2) Qwen 3 (32B FP8)           - ${RED}Requires ~40 GB VRAM${NC}"
 fi
 
-# 3) DeepSeek R1 70B AWQ — flagship reasoning, needs ~38 GB
-if [ "$TOTAL_VRAM" -ge 40 ]; then
-    echo "  3) DeepSeek R1 (70B AWQ)    - Flagship reasoning (~38 GB quantized)"
+# 3) Qwen 3.5 35B MoE AWQ — tiny active params, fits almost anywhere
+echo "  3) Qwen 3.5 (35B MoE AWQ)     - 3B active params, fast (~18 GB)"
+
+# 4) Qwen 3.5 122B MoE AWQ — flagship MoE, needs ~60 GB
+if [ "$TOTAL_VRAM" -ge 80 ]; then
+    echo "  4) Qwen 3.5 (122B MoE AWQ)    - Flagship, 10B active (~60 GB) [Recommended]"
 else
-    echo -e "  3) DeepSeek R1 (70B AWQ)    - ${RED}Requires ~40 GB VRAM (you have ${TOTAL_VRAM} GB)${NC}"
+    echo -e "  4) Qwen 3.5 (122B MoE AWQ)    - ${RED}Requires ~80 GB VRAM (you have ${TOTAL_VRAM} GB)${NC}"
 fi
 
-echo "  4) Skip                     - I'll configure via .env later"
+# 5) DeepSeek R1 70B AWQ — reasoning specialist
+if [ "$TOTAL_VRAM" -ge 40 ]; then
+    echo "  5) DeepSeek R1 (70B AWQ)      - Reasoning specialist (~38 GB)"
+else
+    echo -e "  5) DeepSeek R1 (70B AWQ)      - ${RED}Requires ~40 GB VRAM${NC}"
+fi
+
+echo "  6) Custom                      - Enter a HuggingFace model ID"
+echo "  7) Skip                        - I'll configure via .env later"
 echo ""
-read -p "Select [1-4]: " CHOICE
+read -p "Select [1-7]: " CHOICE
 
 MODEL_ID=""
 PARALLEL=$GPU_COUNT
 MODEL_SIZE_GB=0  # Approximate weight size in GB for memory planning
 TOOL_CALL_ARGS=""  # vLLM tool call parser args (auto-set per model)
+EXTRA_ARGS=""      # Additional vLLM args (e.g. --quantization)
 case $CHOICE in
     1) MODEL_ID="Qwen/Qwen3-8B"; PARALLEL=1; MODEL_SIZE_GB=16
        TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes" ;;
@@ -85,14 +97,29 @@ case $CHOICE in
         TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes"
         ;;
     3)
+        MODEL_ID="cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit"; MODEL_SIZE_GB=18
+        TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes"
+        EXTRA_ARGS="--quantization awq"
+        ;;
+    4)
+        if [ "$TOTAL_VRAM" -lt 80 ]; then
+            echo -e "${RED}✗ Qwen 3.5 122B MoE AWQ requires ~80 GB VRAM (you have ${TOTAL_VRAM} GB).${NC}"
+            exit 1
+        fi
+        MODEL_ID="cyankiwi/Qwen3.5-122B-A10B-AWQ-4bit"; MODEL_SIZE_GB=60
+        TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes"
+        EXTRA_ARGS="--quantization awq"
+        ;;
+    5)
         if [ "$TOTAL_VRAM" -lt 40 ]; then
             echo -e "${RED}✗ DeepSeek R1 70B AWQ requires ~40 GB VRAM (you have ${TOTAL_VRAM} GB).${NC}"
             exit 1
         fi
         MODEL_ID="Valdemardi/DeepSeek-R1-Distill-Llama-70B-AWQ"; MODEL_SIZE_GB=38
         TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes"
+        EXTRA_ARGS="--quantization awq"
         ;;
-    4) read -p "  Enter HuggingFace model ID: " MODEL_ID ;;
+    6) read -p "  Enter HuggingFace model ID: " MODEL_ID ;;
     *) echo "Exiting."; exit 0 ;;
 esac
 
@@ -148,8 +175,8 @@ MAX_CONTEXT=${MAX_CTX}
 # GPU memory utilization (0.0-1.0, auto-tuned for ${MODEL_SIZE_GB}GB model on ${AVAILABLE_VRAM}GB VRAM)
 GPU_MEMORY_UTILIZATION=${GPU_MEM_UTIL}
 
-# Tool call parser args for structured function calling
-TOOL_CALL_ARGS=${TOOL_CALL_ARGS}
+# Tool call parser and extra vLLM args (auto-set per model)
+TOOL_CALL_ARGS=${TOOL_CALL_ARGS} ${EXTRA_ARGS}
 
 # Cache proxy (optional, for faster model downloads)
 # CACHE_PROXY=http://<ip>:3128

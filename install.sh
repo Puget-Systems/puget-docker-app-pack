@@ -469,6 +469,7 @@ case $FLAVOR in
         VLLM_MODEL_SIZE_GB=0
         VLLM_TOOL_CALL_ARGS=""
         VLLM_EXTRA_ARGS=""
+        VLLM_IMAGE="latest"
         case $VLLM_MODEL_SELECT in
             1) VLLM_MODEL_ID="Qwen/Qwen3-8B"; VLLM_GPU_COUNT=1; VLLM_MODEL_SIZE_GB=16
                VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes" ;;
@@ -484,6 +485,7 @@ case $FLAVOR in
                 VLLM_MODEL_ID="cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit"; VLLM_GPU_COUNT=1; VLLM_MODEL_SIZE_GB=18
                 VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes"
                 VLLM_EXTRA_ARGS="--quantization awq"
+                VLLM_IMAGE="nightly"
                 ;;
             4)
                 if [ "$TOTAL_VRAM" -lt 80 ]; then
@@ -492,6 +494,7 @@ case $FLAVOR in
                     VLLM_MODEL_ID="cyankiwi/Qwen3.5-122B-A10B-AWQ-4bit"; VLLM_GPU_COUNT=$GPU_COUNT; VLLM_MODEL_SIZE_GB=60
                     VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes"
                     VLLM_EXTRA_ARGS="--quantization awq"
+                    VLLM_IMAGE="nightly"
                 fi
                 ;;
             5)
@@ -529,6 +532,7 @@ case $FLAVOR in
             fi
             
             echo "MODEL_ID=$VLLM_MODEL_ID" >> "$INSTALL_DIR/.env"
+            echo "VLLM_IMAGE=$VLLM_IMAGE" >> "$INSTALL_DIR/.env"
             echo "GPU_COUNT=$VLLM_GPU_COUNT" >> "$INSTALL_DIR/.env"
             echo "MAX_CONTEXT=$MAX_CTX" >> "$INSTALL_DIR/.env"
             echo "GPU_MEMORY_UTILIZATION=$GPU_MEM_UTIL" >> "$INSTALL_DIR/.env"

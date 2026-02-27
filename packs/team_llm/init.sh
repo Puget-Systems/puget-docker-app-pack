@@ -85,6 +85,7 @@ PARALLEL=$GPU_COUNT
 MODEL_SIZE_GB=0  # Approximate weight size in GB for memory planning
 TOOL_CALL_ARGS=""  # vLLM tool call parser args (auto-set per model)
 EXTRA_ARGS=""      # Additional vLLM args (e.g. --quantization)
+VLLM_IMAGE="latest"  # Docker image tag (nightly for new architectures)
 case $CHOICE in
     1) MODEL_ID="Qwen/Qwen3-8B"; PARALLEL=1; MODEL_SIZE_GB=16
        TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes" ;;
@@ -100,6 +101,7 @@ case $CHOICE in
         MODEL_ID="cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit"; MODEL_SIZE_GB=18
         TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes"
         EXTRA_ARGS="--quantization awq"
+        VLLM_IMAGE="nightly"  # Qwen 3.5 needs bleeding-edge vLLM
         ;;
     4)
         if [ "$TOTAL_VRAM" -lt 80 ]; then
@@ -109,6 +111,7 @@ case $CHOICE in
         MODEL_ID="cyankiwi/Qwen3.5-122B-A10B-AWQ-4bit"; MODEL_SIZE_GB=60
         TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes"
         EXTRA_ARGS="--quantization awq"
+        VLLM_IMAGE="nightly"  # Qwen 3.5 needs bleeding-edge vLLM
         ;;
     5)
         if [ "$TOTAL_VRAM" -lt 40 ]; then
@@ -165,6 +168,9 @@ cat > .env <<EOF
 
 # Model to serve (HuggingFace model ID)
 MODEL_ID=${MODEL_ID}
+
+# vLLM Docker image tag (latest or nightly for bleeding-edge models)
+VLLM_IMAGE=${VLLM_IMAGE}
 
 # Number of GPUs for tensor parallelism
 GPU_COUNT=${PARALLEL}

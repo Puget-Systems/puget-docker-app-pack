@@ -1,7 +1,7 @@
 services:
   # 1. Inference Engine (vLLM)
   inference:
-    image: vllm/vllm-openai:latest
+    image: vllm/vllm-openai:${VLLM_IMAGE:-latest}
     container_name: puget_vllm
     restart: unless-stopped
     deploy:

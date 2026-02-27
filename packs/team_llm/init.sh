@@ -72,14 +72,17 @@ read -p "Select [1-4]: " CHOICE
 MODEL_ID=""
 PARALLEL=$GPU_COUNT
 MODEL_SIZE_GB=0  # Approximate weight size in GB for memory planning
+TOOL_CALL_ARGS=""  # vLLM tool call parser args (auto-set per model)
 case $CHOICE in
-    1) MODEL_ID="Qwen/Qwen3-8B"; PARALLEL=1; MODEL_SIZE_GB=16 ;;
+    1) MODEL_ID="Qwen/Qwen3-8B"; PARALLEL=1; MODEL_SIZE_GB=16
+       TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes" ;;
     2)
         if [ "$TOTAL_VRAM" -lt 40 ]; then
             echo -e "${RED}✗ Qwen 3 32B FP8 requires ~40 GB VRAM (you have ${TOTAL_VRAM} GB).${NC}"
             exit 1
         fi
         MODEL_ID="Qwen/Qwen3-32B-FP8"; MODEL_SIZE_GB=32
+        TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes"
         ;;
     3)
         if [ "$TOTAL_VRAM" -lt 40 ]; then
@@ -87,6 +90,7 @@ case $CHOICE in
             exit 1
         fi
         MODEL_ID="Valdemardi/DeepSeek-R1-Distill-Llama-70B-AWQ"; MODEL_SIZE_GB=38
+        TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes"
         ;;
     4) read -p "  Enter HuggingFace model ID: " MODEL_ID ;;
     *) echo "Exiting."; exit 0 ;;
@@ -143,6 +147,9 @@ MAX_CONTEXT=${MAX_CTX}
 
 # GPU memory utilization (0.0-1.0, auto-tuned for ${MODEL_SIZE_GB}GB model on ${AVAILABLE_VRAM}GB VRAM)
 GPU_MEMORY_UTILIZATION=${GPU_MEM_UTIL}
+
+# Tool call parser args for structured function calling
+TOOL_CALL_ARGS=${TOOL_CALL_ARGS}
 
 # Cache proxy (optional, for faster model downloads)
 # CACHE_PROXY=http://<ip>:3128

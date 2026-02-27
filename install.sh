@@ -462,13 +462,16 @@ case $FLAVOR in
         VLLM_MODEL_ID=""
         VLLM_GPU_COUNT=1
         VLLM_MODEL_SIZE_GB=0
+        VLLM_TOOL_CALL_ARGS=""
         case $VLLM_MODEL_SELECT in
-            1) VLLM_MODEL_ID="Qwen/Qwen3-8B"; VLLM_GPU_COUNT=1; VLLM_MODEL_SIZE_GB=16 ;;
+            1) VLLM_MODEL_ID="Qwen/Qwen3-8B"; VLLM_GPU_COUNT=1; VLLM_MODEL_SIZE_GB=16
+               VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes" ;;
             2)
                 if [ "$TOTAL_VRAM" -lt 40 ]; then
                     echo -e "${RED}✗ Qwen 3 32B FP8 requires ~40 GB VRAM (you have ${TOTAL_VRAM} GB).${NC}"
                 else
                     VLLM_MODEL_ID="Qwen/Qwen3-32B-FP8"; VLLM_GPU_COUNT=$GPU_COUNT; VLLM_MODEL_SIZE_GB=32
+                    VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes"
                 fi
                 ;;
             3)
@@ -476,6 +479,7 @@ case $FLAVOR in
                     echo -e "${RED}✗ DeepSeek R1 70B AWQ requires ~40 GB VRAM (you have ${TOTAL_VRAM} GB).${NC}"
                 else
                     VLLM_MODEL_ID="Valdemardi/DeepSeek-R1-Distill-Llama-70B-AWQ"; VLLM_GPU_COUNT=$GPU_COUNT; VLLM_MODEL_SIZE_GB=38
+                    VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes"
                 fi
                 ;;
             *) echo "Skipping model configuration. Edit .env before starting." ;;
@@ -506,8 +510,10 @@ case $FLAVOR in
             echo "GPU_COUNT=$VLLM_GPU_COUNT" >> "$INSTALL_DIR/.env"
             echo "MAX_CONTEXT=$MAX_CTX" >> "$INSTALL_DIR/.env"
             echo "GPU_MEMORY_UTILIZATION=$GPU_MEM_UTIL" >> "$INSTALL_DIR/.env"
+            echo "TOOL_CALL_ARGS=$VLLM_TOOL_CALL_ARGS" >> "$INSTALL_DIR/.env"
             echo -e "${GREEN}✓ Model: $VLLM_MODEL_ID (${VLLM_GPU_COUNT} GPU(s))${NC}"
             echo -e "  Memory: ${GPU_MEM_UTIL} utilization, ${MAX_CTX} context tokens"
+            echo -e "  Tool calls: enabled (hermes parser)"
             echo -e "  The model will download on first launch."
         fi
         ;;

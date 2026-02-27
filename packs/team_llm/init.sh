@@ -184,6 +184,7 @@ if [[ "$START" != "n" && "$START" != "N" ]]; then
     PHASE_LEVEL=0           # Monotonic: phases only advance forward
     LAST_RESTART_COUNT=0    # Track container restarts to detect crash loops
     CRASH_DETECTIONS=0      # Number of times we've seen a restart increment
+    START_TIME=$(date +%s)  # Track elapsed time
     
     while ! $READY; do
         # Check if container is still running
@@ -225,7 +226,10 @@ if [[ "$START" != "n" && "$START" != "N" ]]; then
         
         # Check if API is responding (model fully loaded)
         if curl -s --max-time 2 http://localhost:8000/v1/models > /dev/null 2>&1; then
-            echo -e "\n${GREEN}✓ Model loaded and ready!${NC}"
+            ELAPSED=$(( $(date +%s) - START_TIME ))
+            ELAPSED_MIN=$((ELAPSED / 60))
+            ELAPSED_SEC=$((ELAPSED % 60))
+            echo -e "\n${GREEN}✓ Model loaded and ready! (${ELAPSED_MIN}m ${ELAPSED_SEC}s)${NC}"
             READY=true
             break
         fi
@@ -298,11 +302,17 @@ if [[ "$START" != "n" && "$START" != "N" ]]; then
             PHASE="$LAST_PHASE"
         fi
         
-        # Print phase with optional detail (overwrites current line)
+        # Calculate elapsed time
+        ELAPSED=$(( $(date +%s) - START_TIME ))
+        ELAPSED_MIN=$((ELAPSED / 60))
+        ELAPSED_SEC=$((ELAPSED % 60))
+        ELAPSED_STR=$(printf "%d:%02d" $ELAPSED_MIN $ELAPSED_SEC)
+        
+        # Print phase with elapsed time and optional detail (overwrites current line)
         if [ -n "$DETAIL" ]; then
-            printf "\r  ⏳ %s... %s   " "$PHASE" "$DETAIL"
+            printf "\r  ⏳ [%s] %s... %s   " "$ELAPSED_STR" "$PHASE" "$DETAIL"
         else
-            printf "\r  ⏳ %s...           " "$PHASE"
+            printf "\r  ⏳ [%s] %s...           " "$ELAPSED_STR" "$PHASE"
         fi
         
         sleep 3

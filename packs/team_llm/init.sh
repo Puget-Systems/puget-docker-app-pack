@@ -171,9 +171,6 @@ if [[ "$START" != "n" && "$START" != "N" ]]; then
     echo ""
     
     CONTAINER_NAME="puget_vllm"
-    # Convert model ID to HF cache directory format (org/model -> models--org--model)
-    HF_CACHE_DIR="models--$(echo "$MODEL_ID" | sed 's|/|--|g')"
-    HF_CACHE_ROOT="/root/.cache/huggingface"
     READY=false
     LAST_PHASE=""
     PHASE_LEVEL=0           # Monotonic: phases only advance forward
@@ -225,9 +222,9 @@ if [[ "$START" != "n" && "$START" != "N" ]]; then
             break
         fi
         
-        # Parse the latest vLLM log line to determine startup phase
-        # Use --tail 10 to catch log lines that may scroll past quickly
-        LAST_LOG=$(docker logs "$CONTAINER_NAME" --tail 10 2>&1)
+        # Parse vLLM logs to determine startup phase
+        # Use --tail 20 for download progress (tqdm bars can be verbose)
+        LAST_LOG=$(docker logs "$CONTAINER_NAME" --tail 20 2>&1)
         CANDIDATE_PHASE=""
         CANDIDATE_LEVEL=0
         DETAIL=""
@@ -251,27 +248,32 @@ if [[ "$START" != "n" && "$START" != "N" ]]; then
             CANDIDATE_PHASE="Loading model weights"
             CANDIDATE_LEVEL=2
             DETAIL="${SHARD_PCT:-starting...}"
-        else
-            # Fall back to download progress
-            # Check full HF cache for this model (blobs can be large, snapshots are symlinks)
-            CACHE_SIZE=$(docker exec "$CONTAINER_NAME" du -smc "${HF_CACHE_ROOT}/hub/${HF_CACHE_DIR}/" 2>/dev/null | tail -1 | awk '{print $1}')
-            if [ -z "$CACHE_SIZE" ] || [ "$CACHE_SIZE" -eq 0 ] 2>/dev/null; then
-                # Try broader search in case HF cache layout differs
-                CACHE_SIZE=$(docker exec "$CONTAINER_NAME" du -smc "${HF_CACHE_ROOT}/" 2>/dev/null | tail -1 | awk '{print $1}')
-            fi
-            if [ -n "$CACHE_SIZE" ] && [ "$CACHE_SIZE" -gt 0 ] 2>/dev/null; then
-                CANDIDATE_PHASE="Downloading model"
-                CANDIDATE_LEVEL=1
-                if [ "$CACHE_SIZE" -ge 1024 ] 2>/dev/null; then
-                    CACHE_GB=$(echo "scale=1; $CACHE_SIZE / 1024" | bc 2>/dev/null || echo "$((CACHE_SIZE / 1024))")
-                    DETAIL="${CACHE_GB} GB cached"
-                else
-                    DETAIL="${CACHE_SIZE} MB cached"
-                fi
+        elif echo "$LAST_LOG" | grep -qiE "Downloading|Fetching"; then
+            # Parse HuggingFace download progress from tqdm bars in logs
+            # Patterns: "Downloading model.safetensors: 45%|...| 2.3G/5.1G"
+            #           "Fetching 15 files: 30%|..."
+            DL_PCT=$(echo "$LAST_LOG" | grep -iE "Downloading|Fetching" | grep -oE '[0-9]+%' | tail -1)
+            # Try to extract size progress like "2.3G/5.1G" or "500M/2.0G"
+            DL_SIZE=$(echo "$LAST_LOG" | grep -iE "Downloading" | grep -oE '[0-9.]+[GMK]/[0-9.]+[GMK]' | tail -1)
+            CANDIDATE_PHASE="Downloading model"
+            CANDIDATE_LEVEL=1
+            if [ -n "$DL_SIZE" ]; then
+                DETAIL="${DL_PCT:-} ${DL_SIZE}"
+            elif [ -n "$DL_PCT" ]; then
+                DETAIL="${DL_PCT}"
             else
-                CANDIDATE_PHASE="Initializing"
+                DETAIL="in progress..."
+            fi
+        else
+            # No recognizable phase in logs
+            if echo "$LAST_LOG" | grep -q "Resolved architecture\|model_tag\|max_model_len"; then
+                CANDIDATE_PHASE="Initializing model"
                 CANDIDATE_LEVEL=0
                 DETAIL=""
+            else
+                CANDIDATE_PHASE="Starting up"
+                CANDIDATE_LEVEL=0
+                DETAIL="waiting..."
             fi
         fi
         

@@ -496,7 +496,7 @@ case $FLAVOR in
                 fi
                 ;;
             3)
-                VLLM_MODEL_ID="cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit"; VLLM_GPU_COUNT=1; VLLM_MODEL_SIZE_GB=18
+                VLLM_MODEL_ID="cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit"; VLLM_GPU_COUNT=$GPU_COUNT; VLLM_MODEL_SIZE_GB=22  # Needs TP: 21.2 GiB actual
                 VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser qwen3_coder"
                 VLLM_REASONING_ARGS="--reasoning-parser qwen3"
                 VLLM_EXTRA_ARGS="--language-model-only --enforce-eager --no-enable-prefix-caching"
@@ -548,13 +548,11 @@ case $FLAVOR in
                 fi
             fi
             
-            # Qwen 3.5 MoE override: hybrid GDN+attention state uses far more memory
-            # per token than pure attention models, plus Triton autotuner needs scratch space.
+            # Qwen 3.5 MoE: hybrid GDN+attention uses more memory per token.
             case "$VLLM_MODEL_ID" in
                 cyankiwi/Qwen3.5-*)
-                    if [ "$MAX_CTX" -gt 8192 ]; then
-                        MAX_CTX=8192
-                        GPU_MEM_UTIL="0.85"
+                    if [ "$MAX_CTX" -gt 16384 ]; then
+                        MAX_CTX=16384
                     fi
                     ;;
             esac

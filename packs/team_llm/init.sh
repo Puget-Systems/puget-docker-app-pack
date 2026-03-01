@@ -111,7 +111,7 @@ case $CHOICE in
         TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes"
         ;;
     3)
-        MODEL_ID="cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit"; MODEL_SIZE_GB=18
+        MODEL_ID="cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit"; MODEL_SIZE_GB=22; PARALLEL=$GPU_COUNT  # Needs TP: model loads at 21.2 GiB, Triton autotuner OOMs on single GPU
         TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser qwen3_coder"
         REASONING_ARGS="--reasoning-parser qwen3"
         EXTRA_VLLM_ARGS="--language-model-only --enforce-eager --no-enable-prefix-caching"
@@ -173,14 +173,12 @@ if [ "$MODEL_SIZE_GB" -gt 0 ] 2>/dev/null; then
     fi
 fi
 
-# Qwen 3.5 MoE override: hybrid GDN+attention state uses far more memory per token
-# than pure attention models, plus Triton autotuner needs scratch space on first inference.
-# Cap context even when weights seem to fit "comfortably".
+# Qwen 3.5 MoE note: hybrid GDN+attention uses more memory per token than pure
+# attention models, and Triton autotuner needs scratch space. Keep moderate context.
 case "$MODEL_ID" in
     cyankiwi/Qwen3.5-*)
-        if [ "$MAX_CTX" -gt 8192 ]; then
-            MAX_CTX=8192
-            GPU_MEM_UTIL="0.85"  # Extra headroom for Triton autotuner
+        if [ "$MAX_CTX" -gt 16384 ]; then
+            MAX_CTX=16384
             echo -e "${YELLOW}  Note: Qwen 3.5 MoE context capped to ${MAX_CTX} tokens (hybrid GDN+attention memory)${NC}"
         fi
         ;;

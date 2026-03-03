@@ -1,0 +1,5 @@
+pyautogen
+autogenstudio
+numpy
+pandas
+openai

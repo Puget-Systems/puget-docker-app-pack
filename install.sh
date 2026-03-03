@@ -14,7 +14,22 @@ echo -e "${BLUE}============================================================${NC
 echo -e "${BLUE}   Puget Systems Docker App Pack - Universal Installer${NC}"
 echo -e "${BLUE}============================================================${NC}"
 
-# 0. Prerequisite Checks
+# 0. Distribution Compatibility Check
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    if [ "$ID" != "ubuntu" ]; then
+        echo -e "\n${RED}✗ Unsupported Linux distribution: ${ID:-unknown}${NC}"
+        echo -e "  The Puget Docker App Pack currently supports ${GREEN}Ubuntu${NC} only."
+        echo -e "  (Detected: $PRETTY_NAME)"
+        exit 1
+    fi
+else
+    echo -e "\n${RED}✗ Cannot detect Linux distribution (/etc/os-release not found).${NC}"
+    echo -e "  The Puget Docker App Pack requires ${GREEN}Ubuntu${NC}."
+    exit 1
+fi
+
+# 1. Prerequisite Checks
 echo -e "\n${YELLOW}[Preflight] Checking dependencies...${NC}"
 
 # Check for Docker
@@ -115,24 +130,79 @@ echo ""
 # We check if nvidia-smi exists AND returns success (0)
 if ! command -v nvidia-smi &> /dev/null || ! nvidia-smi &> /dev/null; then
     echo -e "${RED}✗ NVIDIA drivers not detected (or not active).${NC}"
-    echo "  GPU-accelerated stacks (ComfyUI, Office Inference) require NVIDIA drivers 550+."
+    echo "  GPU-accelerated stacks (ComfyUI, Office Inference) require NVIDIA drivers."
     
     # Offer automated installation
-    read -p "  Would you like to install the NVIDIA drivers (550) now? (Y/n): " INSTALL_DRIVERS
+    read -p "  Would you like to install the recommended NVIDIA drivers now? (Y/n): " INSTALL_DRIVERS
     if [[ "$INSTALL_DRIVERS" != "n" && "$INSTALL_DRIVERS" != "N" ]]; then
-        echo -e "${BLUE}Installing NVIDIA drivers (550)...${NC}"
-        sudo apt update && sudo apt install -y nvidia-driver-550
+        # Ensure ubuntu-drivers-common is available (pre-installed on Ubuntu, but verify)
+        if ! command -v ubuntu-drivers &> /dev/null; then
+            echo -e "${BLUE}Installing driver detection tools...${NC}"
+            sudo apt update && sudo apt install -y ubuntu-drivers-common
+        fi
         
-        echo -e "${YELLOW}⚠ IMPORTANT: Drivers installed.${NC}"
-        echo -e "${YELLOW}  You MUST REBOOT your system before the GPU will be available.${NC}"
-        echo "  Please reboot and run this installer again."
-        exit 0
+        # Show detected GPU and recommended driver
+        echo -e "${BLUE}Detecting GPU hardware...${NC}"
+        ubuntu-drivers devices 2>/dev/null || true
+        echo ""
+        
+        echo -e "${BLUE}Installing recommended NVIDIA drivers for your GPU...${NC}"
+        DRIVER_OUTPUT=$(sudo ubuntu-drivers install 2>&1)
+        DRIVER_EXIT=$?
+        echo "$DRIVER_OUTPUT"
+        
+        if [ $DRIVER_EXIT -ne 0 ]; then
+            echo -e "${RED}✗ Driver installation failed.${NC}"
+            echo "  You may need to install drivers manually."
+            echo "  Try: sudo apt update && sudo ubuntu-drivers install"
+            exit 1
+        fi
+        
+        # Check if anything was actually installed (vs already at newest version)
+        if echo "$DRIVER_OUTPUT" | grep -qE "(0 newly installed|already the newest version|No drivers found)"; then
+            # Drivers are already installed but nvidia-smi still fails.
+            # This is NOT a "just reboot" situation — something deeper is wrong.
+            echo ""
+            echo -e "${RED}════════════════════════════════════════════════════════════${NC}"
+            echo -e "${RED}⚠ NVIDIA drivers are installed but the GPU is not responding.${NC}"
+            echo -e "${RED}════════════════════════════════════════════════════════════${NC}"
+            echo ""
+            echo "  The driver package is already installed, but nvidia-smi cannot"
+            echo "  communicate with the GPU. Common causes:"
+            echo ""
+            echo -e "  1. ${YELLOW}Secure Boot${NC} is blocking the unsigned NVIDIA kernel module."
+            echo "     Check:  mokutil --sb-state"
+            echo "     Fix:    sudo mokutil --disable-validation  (then reboot)"
+            echo ""
+            echo -e "  2. ${YELLOW}Kernel module not loaded${NC} after a kernel update."
+            echo "     Check:  lsmod | grep nvidia"
+            echo "     Fix:    sudo modprobe nvidia"
+            echo ""
+            echo -e "  3. ${YELLOW}Kernel/driver version mismatch${NC} (new kernel, old DKMS build)."
+            echo "     Fix:    sudo ubuntu-drivers install"
+            echo "             sudo dkms autoinstall"
+            echo "             Then reboot."
+            echo ""
+            echo -e "  4. ${YELLOW}Wrong driver variant${NC} for your GPU generation."
+            echo "     Check:  ubuntu-drivers devices"
+            echo "     (Blackwell/RTX 50 series requires the '-open' kernel module variant)"
+            echo ""
+            echo "  Resolve the issue above and re-run this installer."
+            exit 1
+        else
+            # Drivers were freshly installed — reboot is genuinely needed
+            echo -e "${YELLOW}⚠ IMPORTANT: Drivers installed.${NC}"
+            echo -e "${YELLOW}  You MUST REBOOT your system before the GPU will be available.${NC}"
+            echo "  Please reboot and run this installer again."
+            exit 0
+        fi
     else
         echo "  Skipping driver installation. GPU containers may fail to start."
     fi
 else
     DRIVER_VERSION=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1)
-    echo -e "${GREEN}✓ NVIDIA Driver found: $DRIVER_VERSION${NC}"
+    GPU_NAME=$(nvidia-smi --query-gpu=gpu_name --format=csv,noheader | head -1)
+    echo -e "${GREEN}✓ NVIDIA Driver found: $DRIVER_VERSION ($GPU_NAME)${NC}"
 fi
 
 # Check for NVIDIA Container Toolkit (required for GPU access)
@@ -175,12 +245,13 @@ if command -v nvidia-ctk &> /dev/null && command -v docker &> /dev/null; then
     fi
 
     # Verify generic GPU access
-    echo "Verifying GPU access in Docker..."
-    if docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi &> /dev/null; then
+    echo "Verifying GPU access in Docker (this may pull an image)..."
+    if docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi &> /dev/null; then
         echo -e "${GREEN}✓ GPU accessible from Docker.${NC}"
     else
-        echo -e "${YELLOW}⚠ Warning: GPU check failed. Containers may not detect the GPU.${NC}"
-        echo -e "${YELLOW}  This might be due to a missing reboot or driver issue.${NC}"
+        echo -e "${YELLOW}⚠ Warning: GPU verification check did not pass.${NC}"
+        echo -e "${YELLOW}  This is common immediately after driver/toolkit installation.${NC}"
+        echo -e "${YELLOW}  If containers fail to detect the GPU, try: sudo reboot${NC}"
     fi
 fi
 
@@ -280,35 +351,36 @@ case $FLAVOR in
         done
 
         echo ""
-        echo "Available starter models:"
-        echo "  1) SDXL Base 1.0 (~6GB) - Best quality, recommended"
-        echo "  2) SD 1.5 (~2GB) - Lightweight, good for testing"
-        echo "  3) Flux Schnell (~12GB) - Fast, high quality (requires more VRAM)"
-        echo "  4) Skip - I'll download models myself"
+        echo "Select a Creative Stack for your workflow:"
+        echo "  1) Pro Image  (Flux.1 Schnell ~12GB) - SOTA Image Generation"
+        echo "  2) Pro Video  (LTX-Video 2B   ~4GB)  - Best Open Source Video Model"
+        echo "  3) Standard   (SDXL Base 1.0  ~6GB)  - Reliable, Broad Compatibility"
+        echo "  4) Skip       - I'll download models myself"
         echo ""
-        read -p "Select a model to download [1-4]: " MODEL_CHOICE
+        read -p "Select a stack [1-4]: " STACK_CHOICE
         
-        case $MODEL_CHOICE in
+        case $STACK_CHOICE in
             1)
-                echo -e "${BLUE}Downloading SDXL Base 1.0...${NC}"
-                mkdir -p "$INSTALL_DIR/models/checkpoints"
-                wget -q --show-progress -P "$INSTALL_DIR/models/checkpoints/" \
-                    "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors"
-                echo -e "${GREEN}✓ SDXL model downloaded.${NC}"
-                ;;
-            2)
-                echo -e "${BLUE}Downloading SD 1.5...${NC}"
-                mkdir -p "$INSTALL_DIR/models/checkpoints"
-                wget -q --show-progress -P "$INSTALL_DIR/models/checkpoints/" \
-                    "https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors"
-                echo -e "${GREEN}✓ SD 1.5 model downloaded.${NC}"
-                ;;
-            3)
-                echo -e "${BLUE}Downloading Flux Schnell...${NC}"
+                echo -e "${BLUE}Downloading Flux.1 Schnell (Pro Image Stack)...${NC}"
                 mkdir -p "$INSTALL_DIR/models/checkpoints"
                 wget -q --show-progress -P "$INSTALL_DIR/models/checkpoints/" \
                     "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/flux1-schnell.safetensors"
-                echo -e "${GREEN}✓ Flux Schnell model downloaded.${NC}"
+                echo -e "${GREEN}✓ Flux.1 Schnell downloaded.${NC}"
+                ;;
+            2)
+                echo -e "${BLUE}Downloading LTX-Video 2B (Pro Video Stack)...${NC}"
+                mkdir -p "$INSTALL_DIR/models/checkpoints"
+                wget -q --show-progress -P "$INSTALL_DIR/models/checkpoints/" \
+                    "https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.5.safetensors"
+                echo -e "${GREEN}✓ LTX-Video downloaded.${NC}"
+                echo -e "${YELLOW}Note: You will need to install 'ComfyUI-LTXVideo' custom nodes via ComfyUI Manager.${NC}"
+                ;;
+            3)
+                echo -e "${BLUE}Downloading SDXL Base 1.0 (Standard Stack)...${NC}"
+                mkdir -p "$INSTALL_DIR/models/checkpoints"
+                wget -q --show-progress -P "$INSTALL_DIR/models/checkpoints/" \
+                    "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors"
+                echo -e "${GREEN}✓ SDXL Base 1.0 downloaded.${NC}"
                 ;;
             *)
                 echo "Skipping model download."
@@ -318,14 +390,204 @@ case $FLAVOR in
         echo ""
         echo -e "After starting, access ComfyUI at: ${BLUE}http://localhost:8188${NC}"
         ;;
-    office_inference)
-        echo "Office Inference uses Ollama for local AI."
+    personal_llm)
+        echo -e "${GREEN}Personal LLM (Ollama + Open WebUI)${NC}"
+        echo "Note: You will be prompted to download models after the container launches."
+        echo "      (Or use ./init.sh at any time)"
         echo ""
-        echo "After starting, pull a model:"
-        echo -e "  ${GREEN}docker exec -it puget_ollama ollama pull llama3.2${NC}"
-        echo -e "  ${GREEN}docker exec -it puget_ollama ollama pull codellama${NC}"
+        # Cache Proxy Configuration (optional)
+        echo -e "${YELLOW}Cache Proxy (Optional):${NC}"
+        echo "  If this system is on a LAN with a Puget cache proxy (Squid),"
+        echo "  model downloads can be cached to avoid re-downloading."
+        read -p "  Enter cache proxy URL (or press Enter to skip): " CACHE_URL
+        if [ -n "$CACHE_URL" ]; then
+            echo "CACHE_PROXY=$CACHE_URL" >> "$INSTALL_DIR/.env"
+            echo -e "${GREEN}✓ Cache proxy configured: $CACHE_URL${NC}"
+        fi
+        ;;
+    team_llm)
+        echo -e "${GREEN}Team LLM (vLLM + Open WebUI)${NC}"
+        echo "Production inference with multi-GPU tensor parallelism."
         echo ""
-        echo "AutoGen will connect to Ollama at http://ollama:11434"
+        # Cache Proxy Configuration (optional)
+        echo -e "${YELLOW}Cache Proxy (Optional):${NC}"
+        echo "  If this system is on a LAN with a Puget cache proxy (Squid),"
+        echo "  model downloads can be cached to avoid re-downloading."
+        read -p "  Enter cache proxy URL (or press Enter to skip): " CACHE_URL
+        if [ -n "$CACHE_URL" ]; then
+            echo "CACHE_PROXY=$CACHE_URL" >> "$INSTALL_DIR/.env"
+            echo -e "${GREEN}✓ Cache proxy configured: $CACHE_URL${NC}"
+        fi
+        echo ""
+        # GPU Detection
+        echo -e "${YELLOW}GPU Configuration:${NC}"
+        if command -v nvidia-smi &> /dev/null; then
+            GPU_COUNT=$(nvidia-smi --query-gpu=count --format=csv,noheader | head -1)
+            GPU_NAME=$(nvidia-smi --query-gpu=gpu_name --format=csv,noheader | head -1)
+            VRAM_MB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | head -1)
+            VRAM_GB=$((VRAM_MB / 1024))
+            TOTAL_VRAM=$((VRAM_GB * GPU_COUNT))
+            # Detect compute capability for CUDA version selection
+            # Blackwell (RTX 50xx) = compute_cap 12.0+ → requires cu130 Docker images
+            COMPUTE_CAP=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -1)
+            COMPUTE_MAJOR=$(echo "$COMPUTE_CAP" | cut -d. -f1)
+            if [ "${COMPUTE_MAJOR:-0}" -ge 12 ] 2>/dev/null; then
+                NIGHTLY_PREFIX="cu130-nightly"
+                IS_BLACKWELL=true
+                echo -e "${GREEN}  ✓ Found ${GPU_COUNT}x ${GPU_NAME} (${VRAM_GB} GB each, ${TOTAL_VRAM} GB total)${NC}"
+                echo -e "${GREEN}    Blackwell GPU detected (compute ${COMPUTE_CAP}) → using CUDA 13.0 images${NC}"
+            else
+                NIGHTLY_PREFIX="nightly"
+                IS_BLACKWELL=false
+                echo -e "${GREEN}  ✓ Found ${GPU_COUNT}x ${GPU_NAME} (${VRAM_GB} GB each, ${TOTAL_VRAM} GB total)${NC}"
+            fi
+        else
+            GPU_COUNT=1
+            TOTAL_VRAM=32
+            NIGHTLY_PREFIX="nightly"
+            IS_BLACKWELL=false
+            echo -e "${YELLOW}  ⚠ nvidia-smi not found, defaulting to 1 GPU.${NC}"
+        fi
+        echo ""
+        # Model Selection
+        echo -e "${YELLOW}Select a model to serve:${NC}"
+        echo ""
+        echo "  1) Qwen 3 (8B)                - Fast, single GPU (~16 GB BF16)"
+
+        if [ "$TOTAL_VRAM" -ge 40 ]; then
+            echo "  2) Qwen 3 (32B FP8)           - Near-lossless quality (~32 GB)"
+        else
+            echo -e "  2) Qwen 3 (32B FP8)           - ${RED}Requires ~40 GB VRAM${NC}"
+        fi
+
+        DIM='\033[2m'
+        if [ "$IS_BLACKWELL" = true ]; then
+            echo -e "  ${DIM}3) Qwen 3.5 (35B MoE AWQ)     - Coming Soon (Blackwell kernel support pending)${NC}"
+            echo -e "  ${DIM}4) Qwen 3.5 (122B MoE AWQ)    - Coming Soon (Blackwell kernel support pending)${NC}"
+        else
+            echo "  3) Qwen 3.5 (35B MoE AWQ)     - 3B active params, fast (~18 GB)"
+            if [ "$TOTAL_VRAM" -ge 80 ]; then
+                echo "  4) Qwen 3.5 (122B MoE AWQ)    - Flagship, 10B active (~60 GB) [Recommended]"
+            else
+                echo -e "  4) Qwen 3.5 (122B MoE AWQ)    - ${RED}Requires ~80 GB VRAM (you have ${TOTAL_VRAM} GB)${NC}"
+            fi
+        fi
+
+        if [ "$TOTAL_VRAM" -ge 40 ]; then
+            echo "  5) DeepSeek R1 (70B AWQ)      - Reasoning specialist (~38 GB)"
+        else
+            echo -e "  5) DeepSeek R1 (70B AWQ)      - ${RED}Requires ~40 GB VRAM${NC}"
+        fi
+
+        echo "  6) Custom                      - Enter a HuggingFace model ID"
+        echo "  7) Skip                        - I'll configure via .env later"
+        echo ""
+        read -p "Select [1-7]: " VLLM_MODEL_SELECT
+        
+        VLLM_MODEL_ID=""
+        VLLM_GPU_COUNT=1
+        VLLM_MODEL_SIZE_GB=0
+        VLLM_TOOL_CALL_ARGS=""
+        VLLM_REASONING_ARGS=""
+        VLLM_EXTRA_ARGS=""
+        VLLM_DTYPE="auto"
+        VLLM_IMAGE="latest"
+        case $VLLM_MODEL_SELECT in
+            1) VLLM_MODEL_ID="Qwen/Qwen3-8B"; VLLM_GPU_COUNT=1; VLLM_MODEL_SIZE_GB=16
+               VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes" ;;
+            2)
+                if [ "$TOTAL_VRAM" -lt 40 ]; then
+                    echo -e "${RED}✗ Qwen 3 32B FP8 requires ~40 GB VRAM (you have ${TOTAL_VRAM} GB).${NC}"
+                else
+                    VLLM_MODEL_ID="Qwen/Qwen3-32B-FP8"; VLLM_GPU_COUNT=$GPU_COUNT; VLLM_MODEL_SIZE_GB=32
+                    VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes"
+                fi
+                ;;
+            3)
+                if [ "$IS_BLACKWELL" = true ]; then
+                    echo -e "${YELLOW}✗ Qwen 3.5 MoE is not yet supported on Blackwell GPUs (GDN kernel compatibility pending).${NC}"
+                    echo -e "  Please select a different model. Qwen 3 32B FP8 (option 2) is recommended."
+                fi
+                VLLM_MODEL_ID="cyankiwi/Qwen3.5-35B-A3B-AWQ-4bit"; VLLM_GPU_COUNT=$GPU_COUNT; VLLM_MODEL_SIZE_GB=22
+                VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser qwen3_coder"
+                VLLM_REASONING_ARGS="--reasoning-parser qwen3"
+                VLLM_EXTRA_ARGS="--language-model-only --enforce-eager --no-enable-prefix-caching"
+                VLLM_DTYPE="float16"
+                VLLM_IMAGE="${NIGHTLY_PREFIX}"
+                ;;
+            4)
+                if [ "$IS_BLACKWELL" = true ]; then
+                    echo -e "${YELLOW}✗ Qwen 3.5 MoE is not yet supported on Blackwell GPUs (GDN kernel compatibility pending).${NC}"
+                    echo -e "  Please select a different model. Qwen 3 32B FP8 (option 2) is recommended."
+                fi
+                if [ "$TOTAL_VRAM" -lt 80 ]; then
+                    echo -e "${RED}✗ Qwen 3.5 122B MoE AWQ requires ~80 GB VRAM (you have ${TOTAL_VRAM} GB).${NC}"
+                else
+                    VLLM_MODEL_ID="cyankiwi/Qwen3.5-122B-A10B-AWQ-4bit"; VLLM_GPU_COUNT=$GPU_COUNT; VLLM_MODEL_SIZE_GB=60
+                    VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser qwen3_coder"
+                    VLLM_REASONING_ARGS="--reasoning-parser qwen3"
+                    VLLM_EXTRA_ARGS="--language-model-only --enforce-eager --no-enable-prefix-caching"
+                    VLLM_DTYPE="float16"
+                    VLLM_IMAGE="${NIGHTLY_PREFIX}"
+                fi
+                ;;
+            5)
+                if [ "$TOTAL_VRAM" -lt 40 ]; then
+                    echo -e "${RED}✗ DeepSeek R1 70B AWQ requires ~40 GB VRAM (you have ${TOTAL_VRAM} GB).${NC}"
+                else
+                    VLLM_MODEL_ID="Valdemardi/DeepSeek-R1-Distill-Llama-70B-AWQ"; VLLM_GPU_COUNT=$GPU_COUNT; VLLM_MODEL_SIZE_GB=38
+                    VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes"
+                fi
+                ;;
+            6) read -p "  Enter HuggingFace model ID: " VLLM_MODEL_ID ;;
+            *) echo "Skipping model configuration. Edit .env before starting." ;;
+        esac
+        
+        if [ -n "$VLLM_MODEL_ID" ]; then
+            # Auto-tune GPU memory settings based on model size vs available VRAM
+            AVAILABLE_VRAM=$((VRAM_GB * VLLM_GPU_COUNT))
+            GPU_MEM_UTIL="0.90"
+            MAX_CTX=32768
+            
+            if [ "$VLLM_MODEL_SIZE_GB" -gt 0 ] 2>/dev/null; then
+                WEIGHT_PCT=$((VLLM_MODEL_SIZE_GB * 100 / AVAILABLE_VRAM))
+                
+                if [ "$WEIGHT_PCT" -ge 85 ]; then
+                    GPU_MEM_UTIL="0.95"
+                    MAX_CTX=8192
+                elif [ "$WEIGHT_PCT" -ge 70 ]; then
+                    GPU_MEM_UTIL="0.92"
+                    MAX_CTX=16384
+                else
+                    GPU_MEM_UTIL="0.90"
+                    MAX_CTX=32768
+                fi
+            fi
+            
+            # Qwen 3.5 MoE: hybrid GDN+attention uses more memory per token.
+            case "$VLLM_MODEL_ID" in
+                cyankiwi/Qwen3.5-*)
+                    if [ "$MAX_CTX" -gt 16384 ]; then
+                        MAX_CTX=16384
+                    fi
+                    ;;
+            esac
+            
+            echo "MODEL_ID=$VLLM_MODEL_ID" >> "$INSTALL_DIR/.env"
+            echo "VLLM_IMAGE=$VLLM_IMAGE" >> "$INSTALL_DIR/.env"
+            echo "GPU_COUNT=$VLLM_GPU_COUNT" >> "$INSTALL_DIR/.env"
+            echo "MAX_CONTEXT=$MAX_CTX" >> "$INSTALL_DIR/.env"
+            echo "GPU_MEMORY_UTILIZATION=$GPU_MEM_UTIL" >> "$INSTALL_DIR/.env"
+            echo "REASONING_ARGS=$VLLM_REASONING_ARGS" >> "$INSTALL_DIR/.env"
+            echo "TOOL_CALL_ARGS=$VLLM_TOOL_CALL_ARGS" >> "$INSTALL_DIR/.env"
+            echo "EXTRA_VLLM_ARGS=$VLLM_EXTRA_ARGS" >> "$INSTALL_DIR/.env"
+            echo "DTYPE=$VLLM_DTYPE" >> "$INSTALL_DIR/.env"
+            echo -e "${GREEN}✓ Model: $VLLM_MODEL_ID (${VLLM_GPU_COUNT} GPU(s))${NC}"
+            echo -e "  Memory: ${GPU_MEM_UTIL} utilization, ${MAX_CTX} context tokens"
+            PARSER_NAME=$(echo "$VLLM_TOOL_CALL_ARGS" | grep -oE 'tool-call-parser [^ ]+' | awk '{print $2}' || echo "hermes")
+            echo -e "  Tool calls: enabled ($PARSER_NAME parser)"
+            echo -e "  The model will download on first launch."
+        fi
         ;;
     docker-base)
         echo "Base environment ready for Python development."
@@ -378,9 +640,221 @@ if [[ "$START_NOW" != "n" && "$START_NOW" != "N" ]]; then
                 echo -e "  Local:   ${BLUE}http://localhost:8188${NC}"
                 echo -e "  Network: ${BLUE}http://${LOCAL_IP}:8188${NC}"
                 ;;
-            office_inference)
-                echo -e "\n${GREEN}Ollama ready. Pull a model:${NC}"
-                echo -e "  ${BLUE}docker exec -it puget_ollama ollama pull llama3.2${NC}"
+            personal_llm)
+                LOCAL_IP=$(hostname -I | awk '{print $1}')
+                echo -e "\n${GREEN}Access Open WebUI at:${NC}"
+                echo -e "  Local:   ${BLUE}http://localhost:3000${NC}"
+                echo -e "  Network: ${BLUE}http://${LOCAL_IP}:3000${NC}"
+                echo ""
+                echo "Select a starter model to download:"
+                echo "  1) Qwen 3 (8B)         - Fast, Low VRAM (~5 GB)"
+                echo "  2) Qwen 3 (32B)        - Best Quality, Single GPU (~20 GB) [Recommended]"
+                echo "  3) DeepSeek R1 (70B)   - Flagship Reasoning, Dual GPU (~42 GB)"
+                echo "  4) Llama 4 Scout       - Multimodal (text+image), Dual GPU (~63 GB)"
+                echo "  5) Skip                - I'll download models later"
+                echo ""
+                read -p "Select a model [1-5]: " MODEL_SELECT
+                
+                MODEL_TAG=""
+                case $MODEL_SELECT in
+                    1) MODEL_TAG="qwen3:8b" ;;
+                    2) MODEL_TAG="qwen3:32b" ;;
+                    3) MODEL_TAG="deepseek-r1:70b" ;;
+                    4) MODEL_TAG="llama4:scout" ;;
+                    *) echo "Skipping model download." ;;
+                esac
+
+                if [[ -n "$MODEL_TAG" ]]; then
+                     echo -e "${BLUE}Downloading $MODEL_TAG... (This may take a while for larger models)${NC}"
+                     docker compose exec inference ollama pull "$MODEL_TAG"
+                     echo -e "${GREEN}✓ Model ready.${NC}"
+                else
+                     echo -e "Run ${BLUE}./init.sh${NC} later to download models."
+                fi
+                ;;
+            team_llm)
+                LOCAL_IP=$(hostname -I | awk '{print $1}')
+                echo -e "\n${GREEN}vLLM server is starting...${NC}"
+                echo -e "  Chat UI:  ${BLUE}http://localhost:3000${NC}"
+                echo -e "  API:      ${BLUE}http://localhost:8000/v1${NC}"
+                echo -e "  Network:  ${BLUE}http://${LOCAL_IP}:3000${NC}"
+                echo ""
+                
+                # Wait for model download and loading with progress
+                if [ -n "$VLLM_MODEL_ID" ]; then
+                    echo -e "${YELLOW}Waiting for model to download and load...${NC}"
+                    echo "  (This may take 5-30 minutes depending on model size and bandwidth)"
+                    echo ""
+                    
+                    CONTAINER_NAME="puget_vllm"
+                    READY=false
+                    LAST_PHASE=""
+                    PHASE_LEVEL=0           # Monotonic: phases only advance forward
+                    LAST_RESTART_COUNT=0    # Track container restarts to detect crash loops
+                    CRASH_DETECTIONS=0      # Number of times we've seen a restart increment
+                    START_TIME=$(date +%s)  # Track elapsed time
+                    
+                    while ! $READY; do
+                        # Check if container is still running
+                        if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+                            echo -e "\n${RED}✗ vLLM container exited. Check logs:${NC}"
+                            echo -e "  ${BLUE}docker compose logs inference${NC}"
+                            break
+                        fi
+                        
+                        # Detect crash loops (container restarting repeatedly)
+                        RESTART_COUNT=$(docker inspect --format='{{.RestartCount}}' "$CONTAINER_NAME" 2>/dev/null || echo "0")
+                        if [ "$RESTART_COUNT" -gt "$LAST_RESTART_COUNT" ] 2>/dev/null; then
+                            CRASH_DETECTIONS=$((CRASH_DETECTIONS + 1))
+                            LAST_RESTART_COUNT=$RESTART_COUNT
+                            # Reset phase tracking since we're on a fresh attempt
+                            PHASE_LEVEL=0
+                            LAST_PHASE=""
+                        fi
+                        
+                        if [ "$CRASH_DETECTIONS" -ge 2 ]; then
+                            echo ""
+                            echo -e "${RED}✗ vLLM is crash-looping (restarted ${RESTART_COUNT} times).${NC}"
+                            echo ""
+                            # Extract the actual error from the logs
+                            ERROR_MSG=$(docker logs "$CONTAINER_NAME" 2>&1 | grep -E "RuntimeError|OutOfMemoryError|CUDA|Error|error" | tail -5)
+                            if [ -n "$ERROR_MSG" ]; then
+                                echo -e "${RED}  Error from logs:${NC}"
+                                echo "$ERROR_MSG" | while IFS= read -r line; do
+                                    echo -e "  ${YELLOW}${line}${NC}"
+                                done
+                                echo ""
+                            fi
+                            echo "  Troubleshooting:"
+                            echo -e "  ${BLUE}docker compose logs inference${NC}  - View full logs"
+                            echo -e "  Try reducing GPU memory: edit .env and lower MAX_CONTEXT"
+                            echo -e "  Or try a smaller model: ${BLUE}./init.sh${NC}"
+                            break
+                        fi
+                        
+                        # Check if API is responding (model fully loaded)
+                        if curl -s --max-time 2 http://localhost:8000/v1/models > /dev/null 2>&1; then
+                            ELAPSED=$(( $(date +%s) - START_TIME ))
+                            ELAPSED_MIN=$((ELAPSED / 60))
+                            ELAPSED_SEC=$((ELAPSED % 60))
+                            echo -e "\n${GREEN}✓ Model loaded and ready! (${ELAPSED_MIN}m ${ELAPSED_SEC}s)${NC}"
+                            READY=true
+                            break
+                        fi
+                        
+                        # Parse vLLM logs to determine startup phase
+                        # Use --tail 20 for download progress (tqdm bars can be verbose)
+                        LAST_LOG=$(docker logs "$CONTAINER_NAME" --tail 20 2>&1)
+                        CANDIDATE_PHASE=""
+                        CANDIDATE_LEVEL=0
+                        DETAIL=""
+                        
+                        # Check phases in order of progression (highest priority first)
+                        if echo "$LAST_LOG" | grep -q "CUDA graphs"; then
+                            GRAPH_PCT=$(echo "$LAST_LOG" | grep -oE '[0-9]+%\|' | sed 's/|//' | tail -1)
+                            CANDIDATE_PHASE="Capturing CUDA graphs"
+                            CANDIDATE_LEVEL=5
+                            DETAIL="${GRAPH_PCT:-working...}"
+                        elif echo "$LAST_LOG" | grep -q "torch.compile\|Dynamo bytecode\|compile range"; then
+                            CANDIDATE_PHASE="Compiling model kernels"
+                            CANDIDATE_LEVEL=4
+                            DETAIL="(torch.compile)"
+                        elif echo "$LAST_LOG" | grep -q "Autotuning"; then
+                            CANDIDATE_PHASE="Autotuning kernels"
+                            CANDIDATE_LEVEL=3
+                            DETAIL=""
+                        elif echo "$LAST_LOG" | grep -q "Loading safetensors\|Loading weights\|Starting to load model"; then
+                            SHARD_PCT=$(echo "$LAST_LOG" | grep -oE '[0-9]+% Completed' | tail -1)
+                            CANDIDATE_PHASE="Loading model weights"
+                            CANDIDATE_LEVEL=2
+                            DETAIL="${SHARD_PCT:-starting...}"
+                        elif echo "$LAST_LOG" | grep -qiE "Downloading|Fetching"; then
+                            CANDIDATE_PHASE="Downloading model"
+                            CANDIDATE_LEVEL=1
+                            DETAIL=""
+                        fi
+                        
+                        # For any phase at level <= 1, check NET I/O for live download progress
+                        if [ "$CANDIDATE_LEVEL" -le 1 ] || [ -z "$CANDIDATE_PHASE" ]; then
+                            NET_RX=$(docker stats "$CONTAINER_NAME" --no-stream --format '{{.NetIO}}' 2>/dev/null | awk -F'/' '{print $1}' | xargs)
+                            NET_VAL=$(echo "$NET_RX" | grep -oE '[0-9.]+' | head -1)
+                            NET_UNIT=$(echo "$NET_RX" | grep -oE '[A-Za-z]+' | head -1)
+                            
+                            NET_GB=0
+                            case "$NET_UNIT" in
+                                GB|GiB) NET_GB=$(echo "$NET_VAL" | cut -d. -f1) ;;
+                                MB|MiB) NET_GB=0 ;;
+                                TB|TiB) NET_GB=$(($(echo "$NET_VAL" | cut -d. -f1) * 1024)) ;;
+                            esac
+                            
+                            if [ "$NET_GB" -gt 0 ] 2>/dev/null && [ "$VLLM_MODEL_SIZE_GB" -gt 0 ] 2>/dev/null; then
+                                DL_PCT=$((NET_GB * 100 / VLLM_MODEL_SIZE_GB))
+                                [ "$DL_PCT" -gt 100 ] && DL_PCT=100
+                                CANDIDATE_PHASE="Downloading model"
+                                CANDIDATE_LEVEL=1
+                                DETAIL="${DL_PCT}% (${NET_RX} / ${VLLM_MODEL_SIZE_GB} GB)"
+                            elif [ -n "$NET_VAL" ] && echo "$NET_UNIT" | grep -qiE "MB|MiB" 2>/dev/null; then
+                                NET_MB=$(echo "$NET_VAL" | cut -d. -f1)
+                                if [ "${NET_MB:-0}" -gt 50 ] 2>/dev/null; then
+                                    CANDIDATE_PHASE="Downloading model"
+                                    CANDIDATE_LEVEL=1
+                                    DETAIL="${NET_RX}"
+                                elif [ -z "$CANDIDATE_PHASE" ]; then
+                                    if echo "$LAST_LOG" | grep -q "Resolved architecture\|model_tag\|max_model_len"; then
+                                        CANDIDATE_PHASE="Initializing model"
+                                        CANDIDATE_LEVEL=0
+                                        DETAIL=""
+                                    else
+                                        CANDIDATE_PHASE="Starting up"
+                                        CANDIDATE_LEVEL=0
+                                        DETAIL="waiting..."
+                                    fi
+                                fi
+                            elif [ -z "$CANDIDATE_PHASE" ]; then
+                                if echo "$LAST_LOG" | grep -q "Resolved architecture\|model_tag\|max_model_len"; then
+                                    CANDIDATE_PHASE="Initializing model"
+                                    CANDIDATE_LEVEL=0
+                                    DETAIL=""
+                                else
+                                    CANDIDATE_PHASE="Starting up"
+                                    CANDIDATE_LEVEL=0
+                                    DETAIL="waiting..."
+                                fi
+                            fi
+                        fi
+                        
+                        # Only advance phase forward, never regress (prevents oscillation)
+                        if [ "$CANDIDATE_LEVEL" -ge "$PHASE_LEVEL" ]; then
+                            # Print newline to preserve the old status line before showing new phase
+                            if [ "$CANDIDATE_PHASE" != "$LAST_PHASE" ] && [ -n "$LAST_PHASE" ]; then
+                                echo ""
+                            fi
+                            PHASE="$CANDIDATE_PHASE"
+                            PHASE_LEVEL=$CANDIDATE_LEVEL
+                            LAST_PHASE="$PHASE"
+                        else
+                            PHASE="$LAST_PHASE"
+                        fi
+                        
+                        # Calculate elapsed time
+                        ELAPSED=$(( $(date +%s) - START_TIME ))
+                        ELAPSED_MIN=$((ELAPSED / 60))
+                        ELAPSED_SEC=$((ELAPSED % 60))
+                        ELAPSED_STR=$(printf "%d:%02d" $ELAPSED_MIN $ELAPSED_SEC)
+                        
+                        # Print phase with elapsed time and optional detail (overwrites current line)
+                        if [ -n "$DETAIL" ]; then
+                            printf "\r  ⏳ [%s] %s... %s   " "$ELAPSED_STR" "$PHASE" "$DETAIL"
+                        else
+                            printf "\r  ⏳ [%s] %s...           " "$ELAPSED_STR" "$PHASE"
+                        fi
+                        
+                        sleep 3
+                    done
+                    echo ""
+                fi
+                
+                echo -e "  Re-configure model: ${BLUE}./init.sh${NC}"
                 ;;
         esac
     else

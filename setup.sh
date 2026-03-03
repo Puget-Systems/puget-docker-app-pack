@@ -10,6 +10,21 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+# --- Distribution Compatibility Check ---
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    if [ "$ID" != "ubuntu" ]; then
+        echo -e "${RED}Error: Unsupported Linux distribution detected: ${ID:-unknown}${NC}"
+        echo -e "       The Puget Docker App Pack currently supports ${GREEN}Ubuntu${NC} only."
+        echo -e "       (Detected: $PRETTY_NAME)"
+        exit 1
+    fi
+else
+    echo -e "${RED}Error: Cannot detect Linux distribution (/etc/os-release not found).${NC}"
+    echo -e "       The Puget Docker App Pack requires ${GREEN}Ubuntu${NC}."
+    exit 1
+fi
+
 # Default to main if not specified
 BRANCH=${BRANCH:-main}
 REPO_URL="https://github.com/Puget-Systems/puget-docker-app-pack/archive/refs/heads/$BRANCH.tar.gz"

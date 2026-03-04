@@ -377,7 +377,7 @@ case $FLAVOR in
 
         echo -e "  ${BLUE}── Pro Image (Extreme detail, production quality) ──${NC}"
         if [ "$COMFY_VRAM" -ge 16 ]; then
-            echo "  1) Flux.2 Dev (FP8)            - Flagship image gen (~33 GB)"
+            echo "  1) Flux.2 Dev (FP8)            - Flagship image gen (~50 GB total)"
         else
             echo -e "  1) Flux.2 Dev (FP8)            - ${RED}Requires ~16 GB VRAM${NC}"
         fi
@@ -387,7 +387,7 @@ case $FLAVOR in
             echo -e "  2) Flux.1 Dev                  - ${RED}Requires ~16 GB VRAM${NC}"
         fi
         if [ "$COMFY_VRAM" -ge 16 ]; then
-            echo "  3) HiDream I1 Dev (FP8)        - 17B param, high detail (~12 GB)"
+            echo "  3) HiDream I1 Dev (FP8)        - 17B param, high detail (~27 GB)"
         else
             echo -e "  3) HiDream I1 Dev (FP8)        - ${RED}Requires ~16 GB VRAM${NC}"
         fi
@@ -398,7 +398,7 @@ case $FLAVOR in
         echo "  5) Flux.1 Schnell              - Fast Flux generation (~12 GB)"
         echo "  6) SDXL Turbo (FP16)           - Fastest SDXL, real-time (~3 GB)"
         echo "  7) SD 3.5 Medium               - Latest SD3 arch (~5 GB)"
-        echo "  8) Z-Image Turbo               - Fast, high quality (~10 GB)"
+        echo "  8) Z-Image Turbo               - Fast, high quality (~16 GB)"
         echo ""
 
         echo -e "  ${BLUE}── Pro Video ──${NC}"
@@ -417,6 +417,7 @@ case $FLAVOR in
         COMFY_MODEL_DIR="$INSTALL_DIR/models/checkpoints"
         COMFY_HF_TOKEN=""
         COMFY_TEMPLATE_HINT=""
+        COMFY_EXTRA_DOWNLOADS=()
 
         case $COMFY_MODEL_CHOICE in
             1)
@@ -424,6 +425,10 @@ case $FLAVOR in
                 COMFY_MODEL_URL="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/diffusion_models/flux2_dev_fp8mixed.safetensors"
                 COMFY_MODEL_DIR="$INSTALL_DIR/models/diffusion_models"
                 COMFY_TEMPLATE_HINT="Flux.2 Dev"
+                COMFY_EXTRA_DOWNLOADS=(
+                    "$INSTALL_DIR/models/vae|https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/vae/flux2-vae.safetensors"
+                    "$INSTALL_DIR/models/text_encoders|https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_fp8.safetensors"
+                )
                 ;;
             2)
                 COMFY_MODEL_NAME="Flux.1 Dev"
@@ -443,6 +448,13 @@ case $FLAVOR in
                 COMFY_MODEL_URL="https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/diffusion_models/hidream_i1_dev_fp8.safetensors"
                 COMFY_MODEL_DIR="$INSTALL_DIR/models/diffusion_models"
                 COMFY_TEMPLATE_HINT="HiDream"
+                COMFY_EXTRA_DOWNLOADS=(
+                    "$INSTALL_DIR/models/vae|https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/vae/ae.safetensors"
+                    "$INSTALL_DIR/models/text_encoders|https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/text_encoders/clip_g_hidream.safetensors"
+                    "$INSTALL_DIR/models/text_encoders|https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/text_encoders/clip_l_hidream.safetensors"
+                    "$INSTALL_DIR/models/text_encoders|https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/text_encoders/llama_3.1_8b_instruct_fp8_scaled.safetensors"
+                    "$INSTALL_DIR/models/text_encoders|https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/text_encoders/t5xxl_fp8_e4m3fn_scaled.safetensors"
+                )
                 ;;
             4)
                 COMFY_MODEL_NAME="Flux.2 Klein (4B)"
@@ -485,6 +497,10 @@ case $FLAVOR in
                 COMFY_MODEL_URL="https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/diffusion_models/z_image_turbo_bf16.safetensors"
                 COMFY_MODEL_DIR="$INSTALL_DIR/models/diffusion_models"
                 COMFY_TEMPLATE_HINT="Z-Image"
+                COMFY_EXTRA_DOWNLOADS=(
+                    "$INSTALL_DIR/models/vae|https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors"
+                    "$INSTALL_DIR/models/text_encoders|https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b_fp8_mixed.safetensors"
+                )
                 ;;
             9)
                 COMFY_MODEL_NAME="LTX-Video 2B"
@@ -507,18 +523,38 @@ case $FLAVOR in
             fi
             if [ $? -eq 0 ]; then
                 echo -e "${GREEN}✓ ${COMFY_MODEL_NAME} downloaded.${NC}"
-                if [ -n "$COMFY_TEMPLATE_HINT" ]; then
-                    echo ""
-                    echo -e "${BLUE}┌─────────────────────────────────────────────────────────┐${NC}"
-                    echo -e "${BLUE}│${NC}  ${GREEN}Next Step:${NC} Open ComfyUI and search templates for:       ${BLUE}│${NC}"
-                    echo -e "${BLUE}│${NC}  ${YELLOW}"${COMFY_TEMPLATE_HINT}"${NC}                                          ${BLUE}│${NC}"
-                    echo -e "${BLUE}│${NC}                                                         ${BLUE}│${NC}"
-                    echo -e "${BLUE}│${NC}  The template will set up the correct workflow and       ${BLUE}│${NC}"
-                    echo -e "${BLUE}│${NC}  auto-download any additional files (VAE, CLIP, etc.)    ${BLUE}│${NC}"
-                    echo -e "${BLUE}└─────────────────────────────────────────────────────────┘${NC}"
-                fi
             else
                 echo -e "${RED}✗ Download failed. You can retry from within ComfyUI Manager.${NC}"
+            fi
+
+            # Download companion files (VAE, text encoders, LoRAs)
+            for extra in "${COMFY_EXTRA_DOWNLOADS[@]}"; do
+                EXTRA_DIR=$(echo "$extra" | cut -d'|' -f1)
+                EXTRA_URL=$(echo "$extra" | cut -d'|' -f2)
+                EXTRA_NAME=$(basename "$EXTRA_URL")
+                mkdir -p "$EXTRA_DIR"
+                echo -e "${BLUE}  Downloading ${EXTRA_NAME}...${NC}"
+                if [ -n "$COMFY_HF_TOKEN" ]; then
+                    wget -q --show-progress --header="Authorization: Bearer ${COMFY_HF_TOKEN}" -P "$EXTRA_DIR/" "$EXTRA_URL"
+                else
+                    wget -q --show-progress -P "$EXTRA_DIR/" "$EXTRA_URL"
+                fi
+                if [ $? -eq 0 ]; then
+                    echo -e "${GREEN}  ✓ ${EXTRA_NAME}${NC}"
+                else
+                    echo -e "${RED}  ✗ ${EXTRA_NAME} failed — will auto-download when template is opened${NC}"
+                fi
+            done
+
+            if [ -n "$COMFY_TEMPLATE_HINT" ]; then
+                echo ""
+                echo -e "${BLUE}┌─────────────────────────────────────────────────────────┐${NC}"
+                echo -e "${BLUE}│${NC}  ${GREEN}Next Step:${NC} Open ComfyUI and search templates for:       ${BLUE}│${NC}"
+                echo -e "${BLUE}│${NC}  ${YELLOW}\"${COMFY_TEMPLATE_HINT}\"${NC}                                          ${BLUE}│${NC}"
+                echo -e "${BLUE}│${NC}                                                         ${BLUE}│${NC}"
+                echo -e "${BLUE}│${NC}  The template will set up the correct workflow.          ${BLUE}│${NC}"
+                echo -e "${BLUE}│${NC}  All required files have been pre-downloaded.            ${BLUE}│${NC}"
+                echo -e "${BLUE}└─────────────────────────────────────────────────────────┘${NC}"
             fi
         fi
 

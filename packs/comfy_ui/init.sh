@@ -57,7 +57,7 @@ echo -e "  ${BLUE}── Pro Image (Extreme detail, production quality) ──${
 
 # 1) Flux.2 Dev — flagship, gated, ~24 GB (FP8 mixed ~12 GB)
 if [ "$TOTAL_VRAM" -ge 16 ]; then
-    echo "  1) Flux.2 Dev (FP8)            - Flagship image gen (~33 GB)"
+    echo "  1) Flux.2 Dev (FP8)            - Flagship image gen (~50 GB total)"
 else
     echo -e "  1) Flux.2 Dev (FP8)            - ${RED}Requires ~16 GB VRAM${NC}"
 fi
@@ -71,7 +71,7 @@ fi
 
 # 3) HiDream I1 Dev — 17B param, FP8 ~12 GB
 if [ "$TOTAL_VRAM" -ge 16 ]; then
-    echo "  3) HiDream I1 Dev (FP8)        - 17B param, high detail (~12 GB)"
+    echo "  3) HiDream I1 Dev (FP8)        - 17B param, high detail (~27 GB)"
 else
     echo -e "  3) HiDream I1 Dev (FP8)        - ${RED}Requires ~16 GB VRAM${NC}"
 fi
@@ -97,7 +97,7 @@ echo "  6) SDXL Turbo (FP16)           - Fastest SDXL, real-time (~3 GB)"
 echo "  7) SD 3.5 Medium               - Latest SD3 arch (~5 GB)"
 
 # 8) Z-Image Turbo — fast, high quality, ~10 GB
-echo "  8) Z-Image Turbo               - Fast, high quality (~10 GB)"
+echo "  8) Z-Image Turbo               - Fast, high quality (~16 GB)"
 
 echo ""
 
@@ -136,6 +136,10 @@ case $CHOICE in
         MODEL_DIR="models/diffusion_models"
         MODEL_SIZE_GB=33
         TEMPLATE_HINT="Flux.2 Dev"
+        EXTRA_DOWNLOADS=(
+            "models/vae|https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/vae/flux2-vae.safetensors"
+            "models/text_encoders|https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_fp8.safetensors"
+        )
         ;;
     2)
         MODEL_NAME="Flux.1 Dev"
@@ -161,6 +165,13 @@ case $CHOICE in
         MODEL_DIR="models/diffusion_models"
         MODEL_SIZE_GB=12
         TEMPLATE_HINT="HiDream"
+        EXTRA_DOWNLOADS=(
+            "models/vae|https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/vae/ae.safetensors"
+            "models/text_encoders|https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/text_encoders/clip_g_hidream.safetensors"
+            "models/text_encoders|https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/text_encoders/clip_l_hidream.safetensors"
+            "models/text_encoders|https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/text_encoders/llama_3.1_8b_instruct_fp8_scaled.safetensors"
+            "models/text_encoders|https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/text_encoders/t5xxl_fp8_e4m3fn_scaled.safetensors"
+        )
         ;;
     4)
         MODEL_NAME="Flux.2 Klein (4B)"
@@ -210,6 +221,10 @@ case $CHOICE in
         MODEL_DIR="models/diffusion_models"
         MODEL_SIZE_GB=10
         TEMPLATE_HINT="Z-Image"
+        EXTRA_DOWNLOADS=(
+            "models/vae|https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors"
+            "models/text_encoders|https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b_fp8_mixed.safetensors"
+        )
         ;;
     9)
         MODEL_NAME="LTX-Video 2B"
@@ -255,8 +270,8 @@ if [ -n "$MODEL_URL" ]; then
             echo -e "${BLUE}│${NC}  ${GREEN}Next Step:${NC} Open ComfyUI and search templates for:       ${BLUE}│${NC}"
             echo -e "${BLUE}│${NC}  ${YELLOW}\"${TEMPLATE_HINT}\"${NC}                                          ${BLUE}│${NC}"
             echo -e "${BLUE}│${NC}                                                         ${BLUE}│${NC}"
-            echo -e "${BLUE}│${NC}  The template will set up the correct workflow and       ${BLUE}│${NC}"
-            echo -e "${BLUE}│${NC}  auto-download any additional files (VAE, CLIP, etc.)    ${BLUE}│${NC}"
+            echo -e "${BLUE}│${NC}  The template will set up the correct workflow.          ${BLUE}│${NC}"
+            echo -e "${BLUE}│${NC}  All required files have been pre-downloaded.            ${BLUE}│${NC}"
             echo -e "${BLUE}└─────────────────────────────────────────────────────────┘${NC}"
         fi
     else

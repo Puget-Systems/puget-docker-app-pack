@@ -215,13 +215,12 @@ if [ -n "$MODEL_URL" ]; then
 
     mkdir -p "$MODEL_DIR"
 
-    # Build wget args
-    WGET_ARGS="-q --show-progress"
+    # Download with proper auth header for gated models
     if [ -n "${HF_TOKEN:-}" ]; then
-        WGET_ARGS="$WGET_ARGS --header=Authorization:\ Bearer\ ${HF_TOKEN}"
+        wget -q --show-progress --header="Authorization: Bearer ${HF_TOKEN}" -P "$MODEL_DIR/" "$MODEL_URL"
+    else
+        wget -q --show-progress -P "$MODEL_DIR/" "$MODEL_URL"
     fi
-
-    wget $WGET_ARGS -P "$MODEL_DIR/" "$MODEL_URL"
     DL_EXIT=$?
 
     if [ $DL_EXIT -eq 0 ]; then
@@ -240,7 +239,11 @@ if [ -n "$MODEL_URL" ]; then
         EXTRA_NAME=$(basename "$EXTRA_URL")
         mkdir -p "$EXTRA_DIR"
         echo -e "${BLUE}  Downloading ${EXTRA_NAME}...${NC}"
-        wget $WGET_ARGS -P "$EXTRA_DIR/" "$EXTRA_URL"
+        if [ -n "${HF_TOKEN:-}" ]; then
+            wget -q --show-progress --header="Authorization: Bearer ${HF_TOKEN}" -P "$EXTRA_DIR/" "$EXTRA_URL"
+        else
+            wget -q --show-progress -P "$EXTRA_DIR/" "$EXTRA_URL"
+        fi
     done
 else
     echo ""

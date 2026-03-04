@@ -476,11 +476,11 @@ case $FLAVOR in
         if [ -n "$COMFY_MODEL_URL" ]; then
             mkdir -p "$COMFY_MODEL_DIR"
             echo -e "${BLUE}Downloading ${COMFY_MODEL_NAME}...${NC}"
-            COMFY_WGET_ARGS="-q --show-progress"
             if [ -n "$COMFY_HF_TOKEN" ]; then
-                COMFY_WGET_ARGS="$COMFY_WGET_ARGS --header=Authorization:\ Bearer\ ${COMFY_HF_TOKEN}"
+                wget -q --show-progress --header="Authorization: Bearer ${COMFY_HF_TOKEN}" -P "$COMFY_MODEL_DIR/" "$COMFY_MODEL_URL"
+            else
+                wget -q --show-progress -P "$COMFY_MODEL_DIR/" "$COMFY_MODEL_URL"
             fi
-            wget $COMFY_WGET_ARGS -P "$COMFY_MODEL_DIR/" "$COMFY_MODEL_URL"
             if [ $? -eq 0 ]; then
                 echo -e "${GREEN}✓ ${COMFY_MODEL_NAME} downloaded.${NC}"
             else

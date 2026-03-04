@@ -126,6 +126,7 @@ MODEL_NAME=""
 MODEL_URL=""
 MODEL_DIR="models/checkpoints"    # Default target subdirectory
 MODEL_SIZE_GB=0
+TEMPLATE_HINT=""                  # ComfyUI template to search for
 EXTRA_DOWNLOADS=()                # Additional files needed (VAE, CLIP, etc.)
 
 case $CHOICE in
@@ -134,6 +135,7 @@ case $CHOICE in
         MODEL_URL="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/diffusion_models/flux2_dev_fp8mixed.safetensors"
         MODEL_DIR="models/diffusion_models"
         MODEL_SIZE_GB=33
+        TEMPLATE_HINT="Flux.2 Dev"
         ;;
     2)
         MODEL_NAME="Flux.1 Dev"
@@ -151,17 +153,20 @@ case $CHOICE in
             echo "  Download manually or use ComfyUI Manager after launching."
             MODEL_URL=""
         fi
+        TEMPLATE_HINT="Flux.1 Dev"
         ;;
     3)
         MODEL_NAME="HiDream I1 Dev (FP8)"
         MODEL_URL="https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/diffusion_models/hidream_i1_dev_fp8.safetensors"
         MODEL_DIR="models/diffusion_models"
         MODEL_SIZE_GB=12
+        TEMPLATE_HINT="HiDream"
         ;;
     4)
         MODEL_NAME="Flux.2 Klein (4B)"
         MODEL_URL="https://huggingface.co/black-forest-labs/FLUX.2-klein-4B/resolve/main/flux-2-klein-4b.safetensors"
         MODEL_SIZE_GB=8
+        TEMPLATE_HINT="Flux.2 Klein"
         ;;
     5)
         MODEL_NAME="Flux.1 Schnell"
@@ -176,11 +181,13 @@ case $CHOICE in
             echo -e "${RED}✗ Download skipped (no token provided).${NC}"
             MODEL_URL=""
         fi
+        TEMPLATE_HINT="Flux.1 Schnell"
         ;;
     6)
         MODEL_NAME="SDXL Turbo (FP16)"
         MODEL_URL="https://huggingface.co/stabilityai/sdxl-turbo/resolve/main/sd_xl_turbo_1.0_fp16.safetensors"
         MODEL_SIZE_GB=3
+        TEMPLATE_HINT="SDXL Turbo"
         ;;
     7)
         MODEL_NAME="SD 3.5 Medium"
@@ -195,20 +202,20 @@ case $CHOICE in
             echo -e "${RED}✗ Download skipped (no token provided).${NC}"
             MODEL_URL=""
         fi
+        TEMPLATE_HINT="SD3.5 Simple"
         ;;
     8)
         MODEL_NAME="Z-Image Turbo (BF16)"
         MODEL_URL="https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/diffusion_models/z_image_turbo_bf16.safetensors"
         MODEL_DIR="models/diffusion_models"
         MODEL_SIZE_GB=10
-        echo -e "${YELLOW}Note: Z-Image Turbo also needs a text encoder and VAE.${NC}"
-        echo -e "${YELLOW}Open the Z-Image Turbo template in ComfyUI to auto-download them.${NC}"
+        TEMPLATE_HINT="Z-Image"
         ;;
     9)
         MODEL_NAME="LTX-Video 2B"
         MODEL_URL="https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.5.safetensors"
         MODEL_SIZE_GB=4
-        echo -e "${YELLOW}Note: Install 'ComfyUI-LTXVideo' custom nodes via ComfyUI Manager after launch.${NC}"
+        TEMPLATE_HINT="LTX-Video"
         ;;
     *)
         echo ""
@@ -242,6 +249,16 @@ if [ -n "$MODEL_URL" ]; then
 
     if [ $DL_EXIT -eq 0 ]; then
         echo -e "${GREEN}✓ ${MODEL_NAME} downloaded to ${MODEL_DIR}/${NC}"
+        if [ -n "$TEMPLATE_HINT" ]; then
+            echo ""
+            echo -e "${BLUE}┌─────────────────────────────────────────────────────────┐${NC}"
+            echo -e "${BLUE}│${NC}  ${GREEN}Next Step:${NC} Open ComfyUI and search templates for:       ${BLUE}│${NC}"
+            echo -e "${BLUE}│${NC}  ${YELLOW}\"${TEMPLATE_HINT}\"${NC}                                          ${BLUE}│${NC}"
+            echo -e "${BLUE}│${NC}                                                         ${BLUE}│${NC}"
+            echo -e "${BLUE}│${NC}  The template will set up the correct workflow and       ${BLUE}│${NC}"
+            echo -e "${BLUE}│${NC}  auto-download any additional files (VAE, CLIP, etc.)    ${BLUE}│${NC}"
+            echo -e "${BLUE}└─────────────────────────────────────────────────────────┘${NC}"
+        fi
     else
         echo -e "${RED}✗ Download failed (exit code ${DL_EXIT}).${NC}"
         echo "  Check your network connection and try again."

@@ -416,12 +416,14 @@ case $FLAVOR in
         COMFY_MODEL_URL=""
         COMFY_MODEL_DIR="$INSTALL_DIR/models/checkpoints"
         COMFY_HF_TOKEN=""
+        COMFY_TEMPLATE_HINT=""
 
         case $COMFY_MODEL_CHOICE in
             1)
                 COMFY_MODEL_NAME="Flux.2 Dev (FP8)"
                 COMFY_MODEL_URL="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/diffusion_models/flux2_dev_fp8mixed.safetensors"
                 COMFY_MODEL_DIR="$INSTALL_DIR/models/diffusion_models"
+                COMFY_TEMPLATE_HINT="Flux.2 Dev"
                 ;;
             2)
                 COMFY_MODEL_NAME="Flux.1 Dev"
@@ -434,15 +436,18 @@ case $FLAVOR in
                     echo -e "${YELLOW}  Download skipped. Use ComfyUI Manager after launch.${NC}"
                     COMFY_MODEL_URL=""
                 fi
+                COMFY_TEMPLATE_HINT="Flux.1 Dev"
                 ;;
             3)
                 COMFY_MODEL_NAME="HiDream I1 Dev (FP8)"
                 COMFY_MODEL_URL="https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/diffusion_models/hidream_i1_dev_fp8.safetensors"
                 COMFY_MODEL_DIR="$INSTALL_DIR/models/diffusion_models"
+                COMFY_TEMPLATE_HINT="HiDream"
                 ;;
             4)
                 COMFY_MODEL_NAME="Flux.2 Klein (4B)"
                 COMFY_MODEL_URL="https://huggingface.co/black-forest-labs/FLUX.2-klein-4B/resolve/main/flux-2-klein-4b.safetensors"
+                COMFY_TEMPLATE_HINT="Flux.2 Klein"
                 ;;
             5)
                 COMFY_MODEL_NAME="Flux.1 Schnell"
@@ -455,10 +460,12 @@ case $FLAVOR in
                     echo -e "${YELLOW}  Download skipped. Use ComfyUI Manager after launch.${NC}"
                     COMFY_MODEL_URL=""
                 fi
+                COMFY_TEMPLATE_HINT="Flux.1 Schnell"
                 ;;
             6)
                 COMFY_MODEL_NAME="SDXL Turbo (FP16)"
                 COMFY_MODEL_URL="https://huggingface.co/stabilityai/sdxl-turbo/resolve/main/sd_xl_turbo_1.0_fp16.safetensors"
+                COMFY_TEMPLATE_HINT="SDXL Turbo"
                 ;;
             7)
                 COMFY_MODEL_NAME="SD 3.5 Medium"
@@ -471,18 +478,18 @@ case $FLAVOR in
                     echo -e "${YELLOW}  Download skipped. Use ComfyUI Manager after launch.${NC}"
                     COMFY_MODEL_URL=""
                 fi
+                COMFY_TEMPLATE_HINT="SD3.5 Simple"
                 ;;
             8)
                 COMFY_MODEL_NAME="Z-Image Turbo (BF16)"
                 COMFY_MODEL_URL="https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/diffusion_models/z_image_turbo_bf16.safetensors"
                 COMFY_MODEL_DIR="$INSTALL_DIR/models/diffusion_models"
-                echo -e "${YELLOW}Note: Z-Image Turbo also needs a text encoder and VAE.${NC}"
-                echo -e "${YELLOW}Open the Z-Image Turbo template in ComfyUI to auto-download them.${NC}"
+                COMFY_TEMPLATE_HINT="Z-Image"
                 ;;
             9)
                 COMFY_MODEL_NAME="LTX-Video 2B"
                 COMFY_MODEL_URL="https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.5.safetensors"
-                echo -e "${YELLOW}Note: Install 'ComfyUI-LTXVideo' custom nodes via ComfyUI Manager after launch.${NC}"
+                COMFY_TEMPLATE_HINT="LTX-Video"
                 ;;
             *)
                 echo "Skipping model download."
@@ -500,6 +507,16 @@ case $FLAVOR in
             fi
             if [ $? -eq 0 ]; then
                 echo -e "${GREEN}✓ ${COMFY_MODEL_NAME} downloaded.${NC}"
+                if [ -n "$COMFY_TEMPLATE_HINT" ]; then
+                    echo ""
+                    echo -e "${BLUE}┌─────────────────────────────────────────────────────────┐${NC}"
+                    echo -e "${BLUE}│${NC}  ${GREEN}Next Step:${NC} Open ComfyUI and search templates for:       ${BLUE}│${NC}"
+                    echo -e "${BLUE}│${NC}  ${YELLOW}"${COMFY_TEMPLATE_HINT}"${NC}                                          ${BLUE}│${NC}"
+                    echo -e "${BLUE}│${NC}                                                         ${BLUE}│${NC}"
+                    echo -e "${BLUE}│${NC}  The template will set up the correct workflow and       ${BLUE}│${NC}"
+                    echo -e "${BLUE}│${NC}  auto-download any additional files (VAE, CLIP, etc.)    ${BLUE}│${NC}"
+                    echo -e "${BLUE}└─────────────────────────────────────────────────────────┘${NC}"
+                fi
             else
                 echo -e "${RED}✗ Download failed. You can retry from within ComfyUI Manager.${NC}"
             fi

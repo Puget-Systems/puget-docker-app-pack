@@ -398,18 +398,19 @@ case $FLAVOR in
         echo "  5) Flux.1 Schnell              - Fast Flux generation (~12 GB)"
         echo "  6) SDXL Turbo (FP16)           - Fastest SDXL, real-time (~3 GB)"
         echo "  7) SD 3.5 Medium               - Latest SD3 arch (~5 GB)"
+        echo "  8) Z-Image Turbo               - Fast, high quality (~10 GB)"
         echo ""
 
         echo -e "  ${BLUE}── Pro Video ──${NC}"
-        echo "  8) LTX-Video 2B                - Best open-source video (~4 GB)"
+        echo "  9) LTX-Video 2B                - Best open-source video (~4 GB)"
         echo ""
 
-        echo "  9) Skip                        - Download via ComfyUI Manager"
+        echo " 10) Skip                        - Download via ComfyUI Manager"
         echo ""
         echo -e "  ${DIM}Tip: Additional models (Anima Anime, Capybara, Kandinsky, OmniGen2,${NC}"
-        echo -e "  ${DIM}Ovis, Qwen Image, Z-Image, etc.) available via ComfyUI templates.${NC}"
+        echo -e "  ${DIM}Ovis, Qwen Image, etc.) available via ComfyUI templates.${NC}"
         echo ""
-        read -p "Select [1-9]: " COMFY_MODEL_CHOICE
+        read -p "Select [1-10]: " COMFY_MODEL_CHOICE
 
         COMFY_MODEL_NAME=""
         COMFY_MODEL_URL=""
@@ -472,6 +473,13 @@ case $FLAVOR in
                 fi
                 ;;
             8)
+                COMFY_MODEL_NAME="Z-Image Turbo (BF16)"
+                COMFY_MODEL_URL="https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/diffusion_models/z_image_turbo_bf16.safetensors"
+                COMFY_MODEL_DIR="$INSTALL_DIR/models/diffusion_models"
+                echo -e "${YELLOW}Note: Z-Image Turbo also needs a text encoder and VAE.${NC}"
+                echo -e "${YELLOW}Open the Z-Image Turbo template in ComfyUI to auto-download them.${NC}"
+                ;;
+            9)
                 COMFY_MODEL_NAME="LTX-Video 2B"
                 COMFY_MODEL_URL="https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.5.safetensors"
                 echo -e "${YELLOW}Note: Install 'ComfyUI-LTXVideo' custom nodes via ComfyUI Manager after launch.${NC}"

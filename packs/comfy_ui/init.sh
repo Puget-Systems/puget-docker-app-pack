@@ -96,28 +96,31 @@ echo "  6) SDXL Turbo (FP16)           - Fastest SDXL, real-time (~3 GB)"
 # 7) SD 3.5 Medium — latest SD3 arch, ~5 GB
 echo "  7) SD 3.5 Medium               - Latest SD3 arch (~5 GB)"
 
+# 8) Z-Image Turbo — fast, high quality, ~10 GB
+echo "  8) Z-Image Turbo               - Fast, high quality (~10 GB)"
+
 echo ""
 
 # ═══════════════════════════════════════════════════════════
 # Pro Video — keep existing LTX-Video stack
 # ═══════════════════════════════════════════════════════════
 echo -e "  ${BLUE}── Pro Video ──${NC}"
-echo "  8) LTX-Video 2B                - Best open-source video (~4 GB)"
+echo "  9) LTX-Video 2B                - Best open-source video (~4 GB)"
 echo ""
 
 # ═══════════════════════════════════════════════════════════
 # Utility / Skip
 # ═══════════════════════════════════════════════════════════
 echo -e "  ${BLUE}── Utility ──${NC}"
-echo "  9) Skip                        - Download models from ComfyUI Manager"
+echo " 10) Skip                        - Download models from ComfyUI Manager"
 echo ""
 echo -e "  ${DIM}Tip: Many more models are available inside ComfyUI via the${NC}"
 echo -e "  ${DIM}Manager extension tab and built-in templates, including:${NC}"
 echo -e "  ${DIM}Anima Anime, Capybara, Kandinsky, NetaYume Lumina, NewBie Exp,${NC}"
-echo -e "  ${DIM}OmniGen2, Ovis, Qwen Image, and Z-Image. You can install${NC}"
+echo -e "  ${DIM}OmniGen2, Ovis, and Qwen Image. You can install${NC}"
 echo -e "  ${DIM}these after launching ComfyUI.${NC}"
 echo ""
-read -p "Select [1-9]: " CHOICE
+read -p "Select [1-10]: " CHOICE
 
 MODEL_NAME=""
 MODEL_URL=""
@@ -194,6 +197,14 @@ case $CHOICE in
         fi
         ;;
     8)
+        MODEL_NAME="Z-Image Turbo (BF16)"
+        MODEL_URL="https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/diffusion_models/z_image_turbo_bf16.safetensors"
+        MODEL_DIR="models/diffusion_models"
+        MODEL_SIZE_GB=10
+        echo -e "${YELLOW}Note: Z-Image Turbo also needs a text encoder and VAE.${NC}"
+        echo -e "${YELLOW}Open the Z-Image Turbo template in ComfyUI to auto-download them.${NC}"
+        ;;
+    9)
         MODEL_NAME="LTX-Video 2B"
         MODEL_URL="https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.5.safetensors"
         MODEL_SIZE_GB=4

@@ -249,18 +249,21 @@ esac
 
 # --- Download ---
 if [ -n "$MODEL_URL" ]; then
+    MODEL_FILE=$(basename "$MODEL_URL")
     echo ""
-    echo -e "${YELLOW}[3/3] Downloading ${MODEL_NAME}...${NC}"
-
     mkdir -p "$MODEL_DIR"
 
-    # Download with proper auth header for gated models
-    if [ -n "${HF_TOKEN:-}" ]; then
-        wget -q --show-progress --header="Authorization: Bearer ${HF_TOKEN}" -P "$MODEL_DIR/" "$MODEL_URL"
+    if [ -f "$MODEL_DIR/$MODEL_FILE" ]; then
+        echo -e "${GREEN}[3/3] ✓ ${MODEL_NAME} already downloaded, skipping.${NC}"
     else
-        wget -q --show-progress -P "$MODEL_DIR/" "$MODEL_URL"
-    fi
-    DL_EXIT=$?
+        echo -e "${YELLOW}[3/3] Downloading ${MODEL_NAME}...${NC}"
+        # Download with proper auth header for gated models
+        if [ -n "${HF_TOKEN:-}" ]; then
+            wget -nc -q --show-progress --header="Authorization: Bearer ${HF_TOKEN}" -P "$MODEL_DIR/" "$MODEL_URL"
+        else
+            wget -nc -q --show-progress -P "$MODEL_DIR/" "$MODEL_URL"
+        fi
+        DL_EXIT=$?
 
     if [ $DL_EXIT -eq 0 ]; then
         echo -e "${GREEN}✓ ${MODEL_NAME} downloaded to ${MODEL_DIR}/${NC}"
@@ -280,6 +283,7 @@ if [ -n "$MODEL_URL" ]; then
         echo "  For gated models, ensure your HuggingFace token has access."
         echo -e "  You can also download from within ComfyUI using the ${BLUE}Manager${NC} extension."
     fi
+    fi  # end file-exists check
 
     # Download any extra files (VAE, CLIP, etc.)
     for extra in "${EXTRA_DOWNLOADS[@]}"; do
@@ -287,11 +291,15 @@ if [ -n "$MODEL_URL" ]; then
         EXTRA_URL=$(echo "$extra" | cut -d'|' -f2)
         EXTRA_NAME=$(basename "$EXTRA_URL")
         mkdir -p "$EXTRA_DIR"
-        echo -e "${BLUE}  Downloading ${EXTRA_NAME}...${NC}"
-        if [ -n "${HF_TOKEN:-}" ]; then
-            wget -q --show-progress --header="Authorization: Bearer ${HF_TOKEN}" -P "$EXTRA_DIR/" "$EXTRA_URL"
+        if [ -f "$EXTRA_DIR/$EXTRA_NAME" ]; then
+            echo -e "${GREEN}  ✓ ${EXTRA_NAME} (already exists)${NC}"
         else
-            wget -q --show-progress -P "$EXTRA_DIR/" "$EXTRA_URL"
+            echo -e "${BLUE}  Downloading ${EXTRA_NAME}...${NC}"
+            if [ -n "${HF_TOKEN:-}" ]; then
+                wget -nc -q --show-progress --header="Authorization: Bearer ${HF_TOKEN}" -P "$EXTRA_DIR/" "$EXTRA_URL"
+            else
+                wget -nc -q --show-progress -P "$EXTRA_DIR/" "$EXTRA_URL"
+            fi
         fi
     done
 else

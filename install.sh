@@ -514,17 +514,22 @@ case $FLAVOR in
         esac
 
         if [ -n "$COMFY_MODEL_URL" ]; then
+            COMFY_MODEL_FILE=$(basename "$COMFY_MODEL_URL")
             mkdir -p "$COMFY_MODEL_DIR"
-            echo -e "${BLUE}Downloading ${COMFY_MODEL_NAME}...${NC}"
-            if [ -n "$COMFY_HF_TOKEN" ]; then
-                wget -q --show-progress --header="Authorization: Bearer ${COMFY_HF_TOKEN}" -P "$COMFY_MODEL_DIR/" "$COMFY_MODEL_URL"
+            if [ -f "$COMFY_MODEL_DIR/$COMFY_MODEL_FILE" ]; then
+                echo -e "${GREEN}✓ ${COMFY_MODEL_NAME} already downloaded, skipping.${NC}"
             else
-                wget -q --show-progress -P "$COMFY_MODEL_DIR/" "$COMFY_MODEL_URL"
-            fi
-            if [ $? -eq 0 ]; then
-                echo -e "${GREEN}✓ ${COMFY_MODEL_NAME} downloaded.${NC}"
-            else
-                echo -e "${RED}✗ Download failed. You can retry from within ComfyUI Manager.${NC}"
+                echo -e "${BLUE}Downloading ${COMFY_MODEL_NAME}...${NC}"
+                if [ -n "$COMFY_HF_TOKEN" ]; then
+                    wget -nc -q --show-progress --header="Authorization: Bearer ${COMFY_HF_TOKEN}" -P "$COMFY_MODEL_DIR/" "$COMFY_MODEL_URL"
+                else
+                    wget -nc -q --show-progress -P "$COMFY_MODEL_DIR/" "$COMFY_MODEL_URL"
+                fi
+                if [ $? -eq 0 ]; then
+                    echo -e "${GREEN}✓ ${COMFY_MODEL_NAME} downloaded.${NC}"
+                else
+                    echo -e "${RED}✗ Download failed. You can retry from within ComfyUI Manager.${NC}"
+                fi
             fi
 
             # Download companion files (VAE, text encoders, LoRAs)
@@ -533,11 +538,15 @@ case $FLAVOR in
                 EXTRA_URL=$(echo "$extra" | cut -d'|' -f2)
                 EXTRA_NAME=$(basename "$EXTRA_URL")
                 mkdir -p "$EXTRA_DIR"
-                echo -e "${BLUE}  Downloading ${EXTRA_NAME}...${NC}"
-                if [ -n "$COMFY_HF_TOKEN" ]; then
-                    wget -q --show-progress --header="Authorization: Bearer ${COMFY_HF_TOKEN}" -P "$EXTRA_DIR/" "$EXTRA_URL"
+                if [ -f "$EXTRA_DIR/$EXTRA_NAME" ]; then
+                    echo -e "${GREEN}  ✓ ${EXTRA_NAME} (already exists)${NC}"
                 else
-                    wget -q --show-progress -P "$EXTRA_DIR/" "$EXTRA_URL"
+                    echo -e "${BLUE}  Downloading ${EXTRA_NAME}...${NC}"
+                    if [ -n "$COMFY_HF_TOKEN" ]; then
+                        wget -nc -q --show-progress --header="Authorization: Bearer ${COMFY_HF_TOKEN}" -P "$EXTRA_DIR/" "$EXTRA_URL"
+                    else
+                        wget -nc -q --show-progress -P "$EXTRA_DIR/" "$EXTRA_URL"
+                    fi
                 fi
                 if [ $? -eq 0 ]; then
                     echo -e "${GREEN}  ✓ ${EXTRA_NAME}${NC}"

@@ -231,7 +231,7 @@ case $CHOICE in
         TEMPLATE_HINT="Z-Image"
         EXTRA_DOWNLOADS=(
             "models/vae|https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors"
-            "models/text_encoders|https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b_fp8_mixed.safetensors"
+            "models/text_encoders|https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors"
         )
         ;;
     9)

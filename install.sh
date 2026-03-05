@@ -507,7 +507,7 @@ case $FLAVOR in
                 COMFY_TEMPLATE_HINT="Z-Image"
                 COMFY_EXTRA_DOWNLOADS=(
                     "$INSTALL_DIR/models/vae|https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors"
-                    "$INSTALL_DIR/models/text_encoders|https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b_fp8_mixed.safetensors"
+                    "$INSTALL_DIR/models/text_encoders|https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors"
                 )
                 ;;
             9)

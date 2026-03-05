@@ -377,7 +377,7 @@ case $FLAVOR in
 
         echo -e "  ${BLUE}── Pro Image (Extreme detail, production quality) ──${NC}"
         if [ "$COMFY_VRAM" -ge 16 ]; then
-            echo "  1) Flux.2 Dev (FP8)            - Flagship image gen (~69 GB total)"
+            echo "  1) Flux.2 Dev (FP8)            - Flagship image gen (~53 GB total)"
         else
             echo -e "  1) Flux.2 Dev (FP8)            - ${RED}Requires ~16 GB VRAM${NC}"
         fi
@@ -425,9 +425,16 @@ case $FLAVOR in
                 COMFY_MODEL_URL="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/diffusion_models/flux2_dev_fp8mixed.safetensors"
                 COMFY_MODEL_DIR="$INSTALL_DIR/models/diffusion_models"
                 COMFY_TEMPLATE_HINT="Flux.2 Dev"
+                # Text encoder: BF16 (33 GB) needs 48+ GB GPU; FP8 (17 GB) fits on 24-40 GB GPUs
+                if [ "$COMFY_VRAM" -ge 48 ]; then
+                    COMFY_TEXT_ENC="mistral_3_small_flux2_bf16.safetensors"
+                else
+                    COMFY_TEXT_ENC="mistral_3_small_flux2_fp8.safetensors"
+                    echo -e "${YELLOW}  Note: Using FP8 text encoder (fits ${COMFY_VRAM} GB GPU).${NC}"
+                fi
                 COMFY_EXTRA_DOWNLOADS=(
                     "$INSTALL_DIR/models/vae|https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/vae/flux2-vae.safetensors"
-                    "$INSTALL_DIR/models/text_encoders|https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_bf16.safetensors"
+                    "$INSTALL_DIR/models/text_encoders|https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/${COMFY_TEXT_ENC}"
                     "$INSTALL_DIR/models/loras|https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/loras/Flux_2-Turbo-LoRA_comfyui.safetensors"
                 )
                 ;;
@@ -563,7 +570,15 @@ case $FLAVOR in
                 echo -e "${BLUE}│${NC}  ${YELLOW}\"${COMFY_TEMPLATE_HINT}\"${NC}                                          ${BLUE}│${NC}"
                 echo -e "${BLUE}│${NC}                                                         ${BLUE}│${NC}"
                 echo -e "${BLUE}│${NC}  The template will set up the correct workflow.          ${BLUE}│${NC}"
-                echo -e "${BLUE}│${NC}  All required files have been pre-downloaded.            ${BLUE}│${NC}"
+                if [ "${COMFY_TEXT_ENC:-}" = "mistral_3_small_flux2_fp8.safetensors" ]; then
+                    echo -e "${BLUE}│${NC}                                                         ${BLUE}│${NC}"
+                    echo -e "${BLUE}│${NC}  ${YELLOW}⚠ Template may show 'Missing Models' for BF16${NC}          ${BLUE}│${NC}"
+                    echo -e "${BLUE}│${NC}  ${YELLOW}  text encoder (too large for ${COMFY_VRAM} GB GPU).${NC}            ${BLUE}│${NC}"
+                    echo -e "${BLUE}│${NC}  Close the dialog, then in the text encoder node,       ${BLUE}│${NC}"
+                    echo -e "${BLUE}│${NC}  select: ${GREEN}mistral_3_small_flux2_fp8.safetensors${NC}          ${BLUE}│${NC}"
+                else
+                    echo -e "${BLUE}│${NC}  All required files have been pre-downloaded.            ${BLUE}│${NC}"
+                fi
                 echo -e "${BLUE}└─────────────────────────────────────────────────────────┘${NC}"
             fi
         fi

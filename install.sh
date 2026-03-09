@@ -10,6 +10,44 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+# --- Build Fingerprint Helpers ---
+# Detects when Dockerfile/docker-compose.yml/requirements.txt change and
+# triggers a --no-cache rebuild so stale images (e.g. wrong CUDA version)
+# don't cause cryptic runtime failures.
+generate_build_fingerprint() {
+    cat Dockerfile docker-compose.yml requirements.txt 2>/dev/null | sha256sum | awk '{print $1}'
+}
+
+smart_build() {
+    local CURRENT_FP=$(generate_build_fingerprint)
+    local SAVED_FP=""
+    if [ -f ".build_fingerprint" ]; then
+        SAVED_FP=$(cat .build_fingerprint)
+    fi
+
+    if [ -z "$SAVED_FP" ]; then
+        # First build — use normal layer-cached build
+        echo -e "${BLUE}Building container...${NC}"
+        docker compose build
+    elif [ "$CURRENT_FP" != "$SAVED_FP" ]; then
+        echo -e "${YELLOW}⚠ Build configuration has changed since last build.${NC}"
+        echo -e "${BLUE}Rebuilding container (--no-cache)...${NC}"
+        docker compose build --no-cache
+    else
+        # No changes — skip build entirely
+        return 0
+    fi
+
+    local BUILD_EXIT=$?
+    if [ $BUILD_EXIT -ne 0 ]; then
+        echo -e "${RED}✗ Build failed (exit code $BUILD_EXIT).${NC}"
+        return $BUILD_EXIT
+    fi
+    echo "$CURRENT_FP" > .build_fingerprint
+    echo -e "${GREEN}✓ Build fingerprint saved.${NC}"
+    return 0
+}
+
 echo -e "${BLUE}============================================================${NC}"
 echo -e "${BLUE}   Puget Systems Docker App Pack - Universal Installer${NC}"
 echo -e "${BLUE}============================================================${NC}"
@@ -824,7 +862,14 @@ if [[ "$START_NOW" != "n" && "$START_NOW" != "N" ]]; then
         fi
     fi
 
-    docker compose up --build -d
+    # Smart rebuild: detect if build files changed → --no-cache rebuild
+    smart_build
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Build failed. Cannot start container.${NC}"
+        cd - > /dev/null
+        exit 1
+    fi
+    docker compose up -d
     
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✓ Container started successfully!${NC}"

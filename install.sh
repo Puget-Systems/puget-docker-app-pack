@@ -359,6 +359,14 @@ case $FLAVOR in
             chmod 777 "$target"
         done
 
+        # --- ComfyUI Manager (auto-install on first run) ---
+        if [ ! -d "$INSTALL_DIR/custom_nodes/ComfyUI-Manager" ]; then
+            echo ""
+            echo -e "${BLUE}Installing ComfyUI Manager (server-side model & node management)...${NC}"
+            git clone https://github.com/ltdrdata/ComfyUI-Manager.git "$INSTALL_DIR/custom_nodes/ComfyUI-Manager"
+            echo -e "${GREEN}✓ ComfyUI Manager installed.${NC}"
+        fi
+
         # GPU Detection for VRAM gating
         echo ""
         echo -e "${YELLOW}GPU Configuration:${NC}"

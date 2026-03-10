@@ -476,7 +476,8 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            9
+            9,
+            15
           ]
         }
       ],
@@ -835,9 +836,7 @@
           "localized_name": "IMAGE",
           "name": "IMAGE",
           "type": "IMAGE",
-          "links": [
-            15
-          ]
+          "links": []
         },
         {
           "localized_name": "MASK",
@@ -848,7 +847,7 @@
           ]
         }
       ],
-      "title": "Load Puget Logo (Color)",
+      "title": "Logo Mask Source (Puget Logo)",
       "properties": {
         "Node name for S&R": "LoadImage"
       },
@@ -1263,7 +1262,7 @@
     ],
     [
       15,
-      15,
+      8,
       0,
       16,
       0,

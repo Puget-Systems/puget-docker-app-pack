@@ -182,7 +182,7 @@
           "localized_name": "clip",
           "name": "clip",
           "type": "CLIP",
-          "link": null
+          "link": 2
         },
         {
           "localized_name": "text",
@@ -191,7 +191,7 @@
           "widget": {
             "name": "text"
           },
-          "link": 2
+          "link": null
         }
       ],
       "outputs": [
@@ -231,7 +231,7 @@
           "localized_name": "clip",
           "name": "clip",
           "type": "CLIP",
-          "link": null
+          "link": 3
         },
         {
           "localized_name": "text",
@@ -240,7 +240,7 @@
           "widget": {
             "name": "text"
           },
-          "link": 3
+          "link": null
         }
       ],
       "outputs": [
@@ -717,7 +717,7 @@
           "localized_name": "clip",
           "name": "clip",
           "type": "CLIP",
-          "link": null
+          "link": 11
         },
         {
           "localized_name": "text",
@@ -726,7 +726,7 @@
           "widget": {
             "name": "text"
           },
-          "link": 11
+          "link": null
         }
       ],
       "outputs": [
@@ -766,7 +766,7 @@
           "localized_name": "clip",
           "name": "clip",
           "type": "CLIP",
-          "link": null
+          "link": 12
         },
         {
           "localized_name": "text",
@@ -775,7 +775,7 @@
           "widget": {
             "name": "text"
           },
-          "link": 12
+          "link": null
         }
       ],
       "outputs": [
@@ -1162,7 +1162,7 @@
       2,
       0,
       4,
-      1,
+      0,
       "CLIP"
     ],
     [
@@ -1170,7 +1170,7 @@
       2,
       0,
       5,
-      1,
+      0,
       "CLIP"
     ],
     [
@@ -1234,7 +1234,7 @@
       11,
       0,
       13,
-      1,
+      0,
       "CLIP"
     ],
     [
@@ -1242,7 +1242,7 @@
       11,
       0,
       14,
-      1,
+      0,
       "CLIP"
     ],
     [

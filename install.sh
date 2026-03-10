@@ -633,6 +633,21 @@ case $FLAVOR in
             fi
         fi
 
+        # Optional: Gemini API Key for Branded Product Shot workflow
+        echo ""
+        echo -e "${YELLOW}Gemini API Key (Optional):${NC}"
+        echo "  The 'Branded Product Shot' workflow uses Google Gemini to integrate"
+        echo "  logos into generated images. A free API key is available at:"
+        echo -e "  ${BLUE}https://aistudio.google.com/apikey${NC}"
+        echo ""
+        read -p "  Enter Gemini API key (or press Enter to skip): " GEMINI_KEY
+        if [ -n "$GEMINI_KEY" ]; then
+            echo "GEMINI_API_KEY=$GEMINI_KEY" >> "$INSTALL_DIR/.env"
+            echo -e "${GREEN}✓ Gemini API key saved to .env${NC}"
+        else
+            echo -e "${DIM}  Skipped — you can add GEMINI_API_KEY to .env later.${NC}"
+        fi
+
         echo ""
         echo -e "After starting, access ComfyUI at: ${BLUE}http://localhost:8188${NC}"
         echo -e "Run ${BLUE}./${INSTALL_DIR}/init.sh${NC} at any time to download additional models."

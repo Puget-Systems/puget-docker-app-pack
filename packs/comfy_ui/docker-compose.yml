@@ -52,3 +52,4 @@ services:
 
     environment:
       - CLI_ARGS=--listen 0.0.0.0 --preview-method auto
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}

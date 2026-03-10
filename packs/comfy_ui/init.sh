@@ -1,4 +1,6 @@
 #!/bin/bash
+set -euo pipefail
+
 # Puget Systems — ComfyUI Creative AI Initialization
 # Detects GPUs, recommends a model stack, downloads weights, launches.
 
@@ -9,43 +11,43 @@ RED='\033[0;31m'
 DIM='\033[2m'
 NC='\033[0m'
 
-# --- Build Fingerprint Helpers ---
-# Detects when Dockerfile/docker-compose.yml/requirements.txt change and
-# triggers a --no-cache rebuild so stale images (e.g. wrong CUDA version)
-# don't cause cryptic runtime failures.
-generate_build_fingerprint() {
-    cat Dockerfile docker-compose.yml requirements.txt 2>/dev/null | sha256sum | awk '{print $1}'
-}
-
-smart_build() {
-    local CURRENT_FP=$(generate_build_fingerprint)
-    local SAVED_FP=""
-    if [ -f ".build_fingerprint" ]; then
-        SAVED_FP=$(cat .build_fingerprint)
-    fi
-
-    if [ -z "$SAVED_FP" ]; then
-        # First build — use normal layer-cached build
-        echo -e "${BLUE}Building container...${NC}"
-        docker compose build
-    elif [ "$CURRENT_FP" != "$SAVED_FP" ]; then
-        echo -e "${YELLOW}⚠ Build configuration has changed since last build.${NC}"
-        echo -e "${BLUE}Rebuilding container (--no-cache)...${NC}"
-        docker compose build --no-cache
-    else
-        # No changes — skip build entirely
+# --- Source shared smart_build helper (or define inline as fallback) ---
+_SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+_REPO_ROOT="$(cd "$_SCRIPT_DIR/../.." 2>/dev/null && pwd)" || _REPO_ROOT=""
+if [ -f "$_REPO_ROOT/scripts/lib/smart_build.sh" ]; then
+    source "$_REPO_ROOT/scripts/lib/smart_build.sh"
+else
+    # Inline fallback for standalone installs (init.sh copied without repo)
+    generate_build_fingerprint() {
+        cat Dockerfile docker-compose.yml requirements.txt 2>/dev/null | sha256sum | awk '{print $1}'
+    }
+    smart_build() {
+        local CURRENT_FP
+        CURRENT_FP=$(generate_build_fingerprint)
+        local SAVED_FP=""
+        if [ -f ".build_fingerprint" ]; then
+            SAVED_FP=$(cat .build_fingerprint)
+        fi
+        if [ -z "$SAVED_FP" ]; then
+            echo -e "${BLUE}Building container...${NC}"
+            docker compose build
+        elif [ "$CURRENT_FP" != "$SAVED_FP" ]; then
+            echo -e "${YELLOW}⚠ Build configuration has changed since last build.${NC}"
+            echo -e "${BLUE}Rebuilding container (--no-cache)...${NC}"
+            docker compose build --no-cache
+        else
+            return 0
+        fi
+        local BUILD_EXIT=$?
+        if [ $BUILD_EXIT -ne 0 ]; then
+            echo -e "${RED}✗ Build failed (exit code $BUILD_EXIT).${NC}"
+            return $BUILD_EXIT
+        fi
+        echo "$CURRENT_FP" > .build_fingerprint
+        echo -e "${GREEN}✓ Build fingerprint saved.${NC}"
         return 0
-    fi
-
-    local BUILD_EXIT=$?
-    if [ $BUILD_EXIT -ne 0 ]; then
-        echo -e "${RED}✗ Build failed (exit code $BUILD_EXIT).${NC}"
-        return $BUILD_EXIT
-    fi
-    echo "$CURRENT_FP" > .build_fingerprint
-    echo -e "${GREEN}✓ Build fingerprint saved.${NC}"
-    return 0
-}
+    }
+fi
 
 echo -e "${BLUE}============================================================${NC}"
 echo -e "${BLUE}   Puget Systems — ComfyUI Creative AI Setup${NC}"

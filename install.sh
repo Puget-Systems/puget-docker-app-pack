@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Puget Systems Docker App Pack - Universal Installer
 # Standards: Ubuntu 24.04 LTS target, /home/puget-app-pack/app pathing
@@ -10,43 +11,11 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# --- Build Fingerprint Helpers ---
-# Detects when Dockerfile/docker-compose.yml/requirements.txt change and
-# triggers a --no-cache rebuild so stale images (e.g. wrong CUDA version)
-# don't cause cryptic runtime failures.
-generate_build_fingerprint() {
-    cat Dockerfile docker-compose.yml requirements.txt 2>/dev/null | sha256sum | awk '{print $1}'
-}
-
-smart_build() {
-    local CURRENT_FP=$(generate_build_fingerprint)
-    local SAVED_FP=""
-    if [ -f ".build_fingerprint" ]; then
-        SAVED_FP=$(cat .build_fingerprint)
-    fi
-
-    if [ -z "$SAVED_FP" ]; then
-        # First build — use normal layer-cached build
-        echo -e "${BLUE}Building container...${NC}"
-        docker compose build
-    elif [ "$CURRENT_FP" != "$SAVED_FP" ]; then
-        echo -e "${YELLOW}⚠ Build configuration has changed since last build.${NC}"
-        echo -e "${BLUE}Rebuilding container (--no-cache)...${NC}"
-        docker compose build --no-cache
-    else
-        # No changes — skip build entirely
-        return 0
-    fi
-
-    local BUILD_EXIT=$?
-    if [ $BUILD_EXIT -ne 0 ]; then
-        echo -e "${RED}✗ Build failed (exit code $BUILD_EXIT).${NC}"
-        return $BUILD_EXIT
-    fi
-    echo "$CURRENT_FP" > .build_fingerprint
-    echo -e "${GREEN}✓ Build fingerprint saved.${NC}"
-    return 0
-}
+# --- Source shared helpers ---
+INSTALLER_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+source "$INSTALLER_DIR/scripts/lib/gpu_detect.sh"
+source "$INSTALLER_DIR/scripts/lib/smart_build.sh"
+source "$INSTALLER_DIR/scripts/lib/vllm_monitor.sh"
 
 echo -e "${BLUE}============================================================${NC}"
 echo -e "${BLUE}   Puget Systems Docker App Pack - Universal Installer${NC}"
@@ -86,7 +55,7 @@ if ! command -v docker &> /dev/null; then
         
         # 3. Add Docker's official GPG key
         sudo install -m 0755 -d /etc/apt/keyrings
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --yes --dearmor -o /etc/apt/keyrings/docker.gpg
         sudo chmod a+r /etc/apt/keyrings/docker.gpg
         
         # 4. Add the Docker repository
@@ -100,7 +69,7 @@ if ! command -v docker &> /dev/null; then
         sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
         
         # 6. Add user to docker group
-        sudo usermod -aG docker $USER
+        sudo usermod -aG docker "$USER"
         
         echo -e "${GREEN}✓ Docker installed.${NC}"
         echo -e "${YELLOW}  Note: You may need to log out and back in for docker group changes.${NC}"
@@ -118,7 +87,7 @@ if command -v docker &> /dev/null; then
         if id -nG "$USER" | grep -qw "docker"; then
             echo -e "${YELLOW}User added to docker group but session not updated.${NC}"
             echo -e "${BLUE}Reloading installer with group permissions...${NC}"
-            exec sg docker -c "$0 $@"
+            exec sg docker -c "\"$0\" \"$@\""
         fi
     fi
 fi
@@ -303,15 +272,17 @@ fi
 # --- Configuration ---
 
 # Resolve the directory where this script resides to find the packs
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-PACKS_DIR="$SCRIPT_DIR/packs"
+PACKS_DIR="$INSTALLER_DIR/packs"
 
 if [ ! -d "$PACKS_DIR" ]; then
    echo -e "${RED}Error: 'packs' directory not found at $PACKS_DIR!${NC}"
    exit 1
 fi
 
-OPTIONS=($(ls "$PACKS_DIR"))
+OPTIONS=()
+for _d in "$PACKS_DIR"/*/; do
+    OPTIONS+=("$(basename "$_d")")
+done
 
 if [ ${#OPTIONS[@]} -eq 0 ]; then
     echo -e "${RED}Error: No packs found in $PACKS_DIR.${NC}"
@@ -375,8 +346,16 @@ case $FLAVOR in
     comfy_ui)
         echo "ComfyUI requires AI models to generate images."
         
-        # Create required directories with write permissions
-        # This prevents Docker from creating them as root and ensures the container user can write
+        # Ensure puget-app-pack group exists on host (GID 1500, matches container)
+        if ! getent group puget-app-pack > /dev/null 2>&1; then
+            echo -e "${BLUE}Creating 'puget-app-pack' group (GID 1500) for secure volume sharing...${NC}"
+            sudo groupadd -g 1500 puget-app-pack || true
+            sudo usermod -aG puget-app-pack "$USER" || true
+            echo -e "${YELLOW}  Note: You may need to log out and back in for group changes to take effect.${NC}"
+        fi
+
+        # Create required directories with group-writable permissions (775, not 777)
+        # The container runs as puget-app-pack (GID 1500) matching the host group
         echo -e "${BLUE}Ensuring data directories exist and are writable...${NC}"
         COMFY_DIRS=("models" "models/checkpoints" "models/diffusion_models" "models/vae" "models/clip" "models/loras" "models/controlnet" "models/text_encoders" "models/xlabs" "models/xlabs/controlnets" "output" "input" "temp" "custom_nodes" "workflows")
         for dir in "${COMFY_DIRS[@]}"; do
@@ -384,23 +363,21 @@ case $FLAVOR in
             if [ ! -d "$target" ]; then
                 mkdir -p "$target"
             fi
-            # Allow container user to write (since UID might not match host)
-            chmod 777 "$target"
+            chown :"puget-app-pack" "$target" 2>/dev/null || true
+            chmod 775 "$target"
         done
 
         # GPU Detection for VRAM gating
         echo ""
         echo -e "${YELLOW}GPU Configuration:${NC}"
-        COMFY_VRAM=0
-        if command -v nvidia-smi &> /dev/null; then
-            COMFY_GPU_COUNT=$(nvidia-smi --query-gpu=count --format=csv,noheader | head -1)
-            COMFY_GPU_NAME=$(nvidia-smi --query-gpu=gpu_name --format=csv,noheader | head -1)
-            COMFY_VRAM_MB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | head -1)
-            COMFY_VRAM=$((COMFY_VRAM_MB / 1024))
-            COMFY_TOTAL_VRAM=$((COMFY_VRAM * COMFY_GPU_COUNT))
-            COMFY_COMPUTE_CAP=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -1)
-            echo -e "${GREEN}  ✓ Found ${COMFY_GPU_COUNT}x ${COMFY_GPU_NAME} (${COMFY_VRAM} GB each, ${COMFY_TOTAL_VRAM} GB total)${NC}"
+        if detect_gpus; then
+            # Map shared vars to comfy-prefixed names for the model menu
+            COMFY_GPU_COUNT=$GPU_COUNT
+            COMFY_VRAM=$VRAM_GB
+            COMFY_TOTAL_VRAM=$TOTAL_VRAM
+            echo -e "${GREEN}  ✓ Found ${GPU_COUNT}x ${GPU_NAME} (${VRAM_GB} GB each, ${TOTAL_VRAM} GB total)${NC}"
         else
+            COMFY_GPU_COUNT=0
             COMFY_VRAM=0
             COMFY_TOTAL_VRAM=0
             echo -e "${YELLOW}  ⚠ nvidia-smi not found, cannot detect VRAM.${NC}"
@@ -626,17 +603,18 @@ case $FLAVOR in
                 EXTRA_URL=$(echo "$extra" | cut -d'|' -f2)
                 EXTRA_NAME=$(basename "$EXTRA_URL")
                 mkdir -p "$EXTRA_DIR"
+                EXTRA_EXIT=0
                 if [ -f "$EXTRA_DIR/$EXTRA_NAME" ]; then
                     echo -e "${GREEN}  ✓ ${EXTRA_NAME} (already exists)${NC}"
                 else
                     echo -e "${BLUE}  Downloading ${EXTRA_NAME}...${NC}"
                     if [ -n "$COMFY_HF_TOKEN" ]; then
-                        wget -nc -q --show-progress --header="Authorization: Bearer ${COMFY_HF_TOKEN}" -P "$EXTRA_DIR/" "$EXTRA_URL"
+                        wget -nc -q --show-progress --header="Authorization: Bearer ${COMFY_HF_TOKEN}" -P "$EXTRA_DIR/" "$EXTRA_URL" || EXTRA_EXIT=$?
                     else
-                        wget -nc -q --show-progress -P "$EXTRA_DIR/" "$EXTRA_URL"
+                        wget -nc -q --show-progress -P "$EXTRA_DIR/" "$EXTRA_URL" || EXTRA_EXIT=$?
                     fi
                 fi
-                if [ $? -eq 0 ]; then
+                if [ $EXTRA_EXIT -eq 0 ]; then
                     echo -e "${GREEN}  ✓ ${EXTRA_NAME}${NC}"
                 else
                     echo -e "${RED}  ✗ ${EXTRA_NAME} failed — will auto-download when template is opened${NC}"
@@ -698,31 +676,15 @@ case $FLAVOR in
         echo ""
         # GPU Detection
         echo -e "${YELLOW}GPU Configuration:${NC}"
-        if command -v nvidia-smi &> /dev/null; then
-            GPU_COUNT=$(nvidia-smi --query-gpu=count --format=csv,noheader | head -1)
-            GPU_NAME=$(nvidia-smi --query-gpu=gpu_name --format=csv,noheader | head -1)
-            VRAM_MB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | head -1)
-            VRAM_GB=$((VRAM_MB / 1024))
-            TOTAL_VRAM=$((VRAM_GB * GPU_COUNT))
-            # Detect compute capability for CUDA version selection
-            # Blackwell (RTX 50xx) = compute_cap 12.0+ → requires cu130 Docker images
-            COMPUTE_CAP=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -1)
-            COMPUTE_MAJOR=$(echo "$COMPUTE_CAP" | cut -d. -f1)
-            if [ "${COMPUTE_MAJOR:-0}" -ge 12 ] 2>/dev/null; then
-                NIGHTLY_PREFIX="cu130-nightly"
-                IS_BLACKWELL=true
-                echo -e "${GREEN}  ✓ Found ${GPU_COUNT}x ${GPU_NAME} (${VRAM_GB} GB each, ${TOTAL_VRAM} GB total)${NC}"
+        if detect_gpus; then
+            echo -e "${GREEN}  ✓ Found ${GPU_COUNT}x ${GPU_NAME} (${VRAM_GB} GB each, ${TOTAL_VRAM} GB total)${NC}"
+            if [ "$IS_BLACKWELL" = true ]; then
                 echo -e "${GREEN}    Blackwell GPU detected (compute ${COMPUTE_CAP}) → using CUDA 13.0 images${NC}"
-            else
-                NIGHTLY_PREFIX="nightly"
-                IS_BLACKWELL=false
-                echo -e "${GREEN}  ✓ Found ${GPU_COUNT}x ${GPU_NAME} (${VRAM_GB} GB each, ${TOTAL_VRAM} GB total)${NC}"
             fi
         else
             GPU_COUNT=1
             TOTAL_VRAM=32
-            NIGHTLY_PREFIX="nightly"
-            IS_BLACKWELL=false
+            VRAM_GB=32
             echo -e "${YELLOW}  ⚠ nvidia-smi not found, defaulting to 1 GPU.${NC}"
         fi
         echo ""
@@ -969,173 +931,7 @@ if [[ "$START_NOW" != "n" && "$START_NOW" != "N" ]]; then
                     echo -e "${YELLOW}Waiting for model to download and load...${NC}"
                     echo "  (This may take 5-30 minutes depending on model size and bandwidth)"
                     echo ""
-                    
-                    CONTAINER_NAME="puget_vllm"
-                    READY=false
-                    LAST_PHASE=""
-                    PHASE_LEVEL=0           # Monotonic: phases only advance forward
-                    LAST_RESTART_COUNT=0    # Track container restarts to detect crash loops
-                    CRASH_DETECTIONS=0      # Number of times we've seen a restart increment
-                    START_TIME=$(date +%s)  # Track elapsed time
-                    
-                    while ! $READY; do
-                        # Check if container is still running
-                        if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
-                            echo -e "\n${RED}✗ vLLM container exited. Check logs:${NC}"
-                            echo -e "  ${BLUE}docker compose logs inference${NC}"
-                            break
-                        fi
-                        
-                        # Detect crash loops (container restarting repeatedly)
-                        RESTART_COUNT=$(docker inspect --format='{{.RestartCount}}' "$CONTAINER_NAME" 2>/dev/null || echo "0")
-                        if [ "$RESTART_COUNT" -gt "$LAST_RESTART_COUNT" ] 2>/dev/null; then
-                            CRASH_DETECTIONS=$((CRASH_DETECTIONS + 1))
-                            LAST_RESTART_COUNT=$RESTART_COUNT
-                            # Reset phase tracking since we're on a fresh attempt
-                            PHASE_LEVEL=0
-                            LAST_PHASE=""
-                        fi
-                        
-                        if [ "$CRASH_DETECTIONS" -ge 2 ]; then
-                            echo ""
-                            echo -e "${RED}✗ vLLM is crash-looping (restarted ${RESTART_COUNT} times).${NC}"
-                            echo ""
-                            # Extract the actual error from the logs
-                            ERROR_MSG=$(docker logs "$CONTAINER_NAME" 2>&1 | grep -E "RuntimeError|OutOfMemoryError|CUDA|Error|error" | tail -5)
-                            if [ -n "$ERROR_MSG" ]; then
-                                echo -e "${RED}  Error from logs:${NC}"
-                                echo "$ERROR_MSG" | while IFS= read -r line; do
-                                    echo -e "  ${YELLOW}${line}${NC}"
-                                done
-                                echo ""
-                            fi
-                            echo "  Troubleshooting:"
-                            echo -e "  ${BLUE}docker compose logs inference${NC}  - View full logs"
-                            echo -e "  Try reducing GPU memory: edit .env and lower MAX_CONTEXT"
-                            echo -e "  Or try a smaller model: ${BLUE}./init.sh${NC}"
-                            break
-                        fi
-                        
-                        # Check if API is responding (model fully loaded)
-                        if curl -s --max-time 2 http://localhost:8000/v1/models > /dev/null 2>&1; then
-                            ELAPSED=$(( $(date +%s) - START_TIME ))
-                            ELAPSED_MIN=$((ELAPSED / 60))
-                            ELAPSED_SEC=$((ELAPSED % 60))
-                            echo -e "\n${GREEN}✓ Model loaded and ready! (${ELAPSED_MIN}m ${ELAPSED_SEC}s)${NC}"
-                            READY=true
-                            break
-                        fi
-                        
-                        # Parse vLLM logs to determine startup phase
-                        # Use --tail 20 for download progress (tqdm bars can be verbose)
-                        LAST_LOG=$(docker logs "$CONTAINER_NAME" --tail 20 2>&1)
-                        CANDIDATE_PHASE=""
-                        CANDIDATE_LEVEL=0
-                        DETAIL=""
-                        
-                        # Check phases in order of progression (highest priority first)
-                        if echo "$LAST_LOG" | grep -q "CUDA graphs"; then
-                            GRAPH_PCT=$(echo "$LAST_LOG" | grep -oE '[0-9]+%\|' | sed 's/|//' | tail -1)
-                            CANDIDATE_PHASE="Capturing CUDA graphs"
-                            CANDIDATE_LEVEL=5
-                            DETAIL="${GRAPH_PCT:-working...}"
-                        elif echo "$LAST_LOG" | grep -q "torch.compile\|Dynamo bytecode\|compile range"; then
-                            CANDIDATE_PHASE="Compiling model kernels"
-                            CANDIDATE_LEVEL=4
-                            DETAIL="(torch.compile)"
-                        elif echo "$LAST_LOG" | grep -q "Autotuning"; then
-                            CANDIDATE_PHASE="Autotuning kernels"
-                            CANDIDATE_LEVEL=3
-                            DETAIL=""
-                        elif echo "$LAST_LOG" | grep -q "Loading safetensors\|Loading weights\|Starting to load model"; then
-                            SHARD_PCT=$(echo "$LAST_LOG" | grep -oE '[0-9]+% Completed' | tail -1)
-                            CANDIDATE_PHASE="Loading model weights"
-                            CANDIDATE_LEVEL=2
-                            DETAIL="${SHARD_PCT:-starting...}"
-                        elif echo "$LAST_LOG" | grep -qiE "Downloading|Fetching"; then
-                            CANDIDATE_PHASE="Downloading model"
-                            CANDIDATE_LEVEL=1
-                            DETAIL=""
-                        fi
-                        
-                        # For any phase at level <= 1, check NET I/O for live download progress
-                        if [ "$CANDIDATE_LEVEL" -le 1 ] || [ -z "$CANDIDATE_PHASE" ]; then
-                            NET_RX=$(docker stats "$CONTAINER_NAME" --no-stream --format '{{.NetIO}}' 2>/dev/null | awk -F'/' '{print $1}' | xargs)
-                            NET_VAL=$(echo "$NET_RX" | grep -oE '[0-9.]+' | head -1)
-                            NET_UNIT=$(echo "$NET_RX" | grep -oE '[A-Za-z]+' | head -1)
-                            
-                            NET_GB=0
-                            case "$NET_UNIT" in
-                                GB|GiB) NET_GB=$(echo "$NET_VAL" | cut -d. -f1) ;;
-                                MB|MiB) NET_GB=0 ;;
-                                TB|TiB) NET_GB=$(($(echo "$NET_VAL" | cut -d. -f1) * 1024)) ;;
-                            esac
-                            
-                            if [ "$NET_GB" -gt 0 ] 2>/dev/null && [ "$VLLM_MODEL_SIZE_GB" -gt 0 ] 2>/dev/null; then
-                                DL_PCT=$((NET_GB * 100 / VLLM_MODEL_SIZE_GB))
-                                [ "$DL_PCT" -gt 100 ] && DL_PCT=100
-                                CANDIDATE_PHASE="Downloading model"
-                                CANDIDATE_LEVEL=1
-                                DETAIL="${DL_PCT}% (${NET_RX} / ${VLLM_MODEL_SIZE_GB} GB)"
-                            elif [ -n "$NET_VAL" ] && echo "$NET_UNIT" | grep -qiE "MB|MiB" 2>/dev/null; then
-                                NET_MB=$(echo "$NET_VAL" | cut -d. -f1)
-                                if [ "${NET_MB:-0}" -gt 50 ] 2>/dev/null; then
-                                    CANDIDATE_PHASE="Downloading model"
-                                    CANDIDATE_LEVEL=1
-                                    DETAIL="${NET_RX}"
-                                elif [ -z "$CANDIDATE_PHASE" ]; then
-                                    if echo "$LAST_LOG" | grep -q "Resolved architecture\|model_tag\|max_model_len"; then
-                                        CANDIDATE_PHASE="Initializing model"
-                                        CANDIDATE_LEVEL=0
-                                        DETAIL=""
-                                    else
-                                        CANDIDATE_PHASE="Starting up"
-                                        CANDIDATE_LEVEL=0
-                                        DETAIL="waiting..."
-                                    fi
-                                fi
-                            elif [ -z "$CANDIDATE_PHASE" ]; then
-                                if echo "$LAST_LOG" | grep -q "Resolved architecture\|model_tag\|max_model_len"; then
-                                    CANDIDATE_PHASE="Initializing model"
-                                    CANDIDATE_LEVEL=0
-                                    DETAIL=""
-                                else
-                                    CANDIDATE_PHASE="Starting up"
-                                    CANDIDATE_LEVEL=0
-                                    DETAIL="waiting..."
-                                fi
-                            fi
-                        fi
-                        
-                        # Only advance phase forward, never regress (prevents oscillation)
-                        if [ "$CANDIDATE_LEVEL" -ge "$PHASE_LEVEL" ]; then
-                            # Print newline to preserve the old status line before showing new phase
-                            if [ "$CANDIDATE_PHASE" != "$LAST_PHASE" ] && [ -n "$LAST_PHASE" ]; then
-                                echo ""
-                            fi
-                            PHASE="$CANDIDATE_PHASE"
-                            PHASE_LEVEL=$CANDIDATE_LEVEL
-                            LAST_PHASE="$PHASE"
-                        else
-                            PHASE="$LAST_PHASE"
-                        fi
-                        
-                        # Calculate elapsed time
-                        ELAPSED=$(( $(date +%s) - START_TIME ))
-                        ELAPSED_MIN=$((ELAPSED / 60))
-                        ELAPSED_SEC=$((ELAPSED % 60))
-                        ELAPSED_STR=$(printf "%d:%02d" $ELAPSED_MIN $ELAPSED_SEC)
-                        
-                        # Print phase with elapsed time and optional detail (overwrites current line)
-                        if [ -n "$DETAIL" ]; then
-                            printf "\r  ⏳ [%s] %s... %s   " "$ELAPSED_STR" "$PHASE" "$DETAIL"
-                        else
-                            printf "\r  ⏳ [%s] %s...           " "$ELAPSED_STR" "$PHASE"
-                        fi
-                        
-                        sleep 3
-                    done
-                    echo ""
+                    wait_for_vllm "puget_vllm" "$VLLM_MODEL_SIZE_GB"
                 fi
                 
                 echo -e "  Re-configure model: ${BLUE}./init.sh${NC}"

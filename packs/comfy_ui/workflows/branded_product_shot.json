@@ -116,7 +116,7 @@
       },
       "widgets_values": [
         "qwen_3_4b.safetensors",
-        "z_image",
+        "qwen_image",
         "default"
       ]
     },

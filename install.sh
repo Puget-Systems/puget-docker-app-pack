@@ -412,24 +412,12 @@ case $FLAVOR in
         echo "  9) LTX-Video 2B                - Best open-source video (~4 GB)"
         echo ""
 
-        echo -e "  ${BLUE}── Workflows (Multi-Model) ──${NC}"
-        if [ "$COMFY_GPU_COUNT" -ge 2 ] 2>/dev/null; then
-            echo " 10) Branded Product Shot        - Z-Image + Flux.2 inpaint (~73 GB) [Recommended]"
-            echo -e "  ${DIM}    Generate hero image → inpaint your logo with ControlNet${NC}"
-        elif [ "$COMFY_VRAM" -ge 24 ]; then
-            echo " 10) Branded Product Shot        - Z-Image + Flux.2 inpaint (~73 GB) (sequential)"
-            echo -e "  ${DIM}    Generate hero image → inpaint your logo with ControlNet${NC}"
-        else
-            echo -e " 10) Branded Product Shot        - ${RED}Requires 24+ GB VRAM${NC}"
-        fi
-        echo ""
-
-        echo " 11) Skip                        - Download via ComfyUI Manager"
+        echo " 10) Skip                        - Download models from ComfyUI Manager"
         echo ""
         echo -e "  ${DIM}Tip: Additional models (Anima Anime, Capybara, Kandinsky, OmniGen2,${NC}"
-        echo -e "  ${DIM}Ovis, Qwen Image, etc.) available via ComfyUI templates.${NC}"
+        echo -e "  ${DIM}Ovis, Qwen Image, etc.) available via ComfyUI Manager and templates.${NC}"
         echo ""
-        read -p "Select [1-11]: " COMFY_MODEL_CHOICE
+        read -p "Select [1-10]: " COMFY_MODEL_CHOICE
 
         COMFY_MODEL_NAME=""
         COMFY_MODEL_URL=""
@@ -534,36 +522,7 @@ case $FLAVOR in
                 COMFY_MODEL_URL="https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.5.safetensors"
                 COMFY_TEMPLATE_HINT="LTX-Video"
                 ;;
-            10)
-                COMFY_MODEL_NAME="Branded Product Shot"
-                COMFY_MODEL_URL="https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/diffusion_models/z_image_turbo_bf16.safetensors"
-                COMFY_MODEL_DIR="$INSTALL_DIR/models/diffusion_models"
-                COMFY_TEMPLATE_HINT=""
-                # Text encoder: Flux.2 Dev uses Mistral — FP8 for ≤40 GB, BF16 for 48+ GB
-                if [ "$COMFY_VRAM" -ge 48 ]; then
-                    COMFY_FLUX_TEXT_ENC="mistral_3_small_flux2_bf16.safetensors"
-                else
-                    COMFY_FLUX_TEXT_ENC="mistral_3_small_flux2_fp8.safetensors"
-                fi
-                COMFY_EXTRA_DOWNLOADS=(
-                    # Z-Image Turbo companions
-                    "$INSTALL_DIR/models/vae|https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors"
-                    "$INSTALL_DIR/models/text_encoders|https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors"
-                    # Flux.2 Dev FP8 (inpainting stage)
-                    "$INSTALL_DIR/models/diffusion_models|https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/diffusion_models/flux2_dev_fp8mixed.safetensors"
-                    "$INSTALL_DIR/models/vae|https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/vae/flux2-vae.safetensors"
-                    "$INSTALL_DIR/models/text_encoders|https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/${COMFY_FLUX_TEXT_ENC}"
-                    # ControlNet Canny for logo edge-guided inpainting (XLabs-AI)
-                    "$INSTALL_DIR/models/xlabs/controlnets|https://huggingface.co/XLabs-AI/flux-controlnet-canny/resolve/main/controlnet.safetensors"
-                )
-                echo ""
-                if [ "$COMFY_GPU_COUNT" -ge 2 ] 2>/dev/null; then
-                    echo -e "${GREEN}  Dual GPU detected — both models will stay loaded for max speed.${NC}"
-                else
-                    echo -e "${YELLOW}  Single GPU — models will load/unload sequentially (still works, slightly slower).${NC}"
-                fi
-                echo -e "${BLUE}  This downloads Z-Image Turbo + Flux.2 Dev + ControlNet Canny (~73 GB total).${NC}"
-                ;;
+
             *)
                 echo "Skipping model download."
                 echo -e "You can download models from within ComfyUI using the ${BLUE}Manager${NC} extension."

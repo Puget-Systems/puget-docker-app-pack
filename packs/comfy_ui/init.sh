@@ -63,10 +63,16 @@ fi
 # Ensure Manager directory is writable by container (UID mismatch)
 chmod -R 777 custom_nodes/ComfyUI-Manager 2>/dev/null || true
 
-# Merge Puget template models into Manager's model list
-if [ -f "puget-models.json" ] && [ -f "custom_nodes/ComfyUI-Manager/model-list.json" ]; then
-    python3 merge_puget_models.py puget-models.json custom_nodes/ComfyUI-Manager/model-list.json 2>/dev/null || true
+# Install Puget model merge as a Manager startup script
+# This runs inside ComfyUI after Manager downloads its cache, so our
+# template models (Z-Image, Flux.2, HiDream) appear in the model browser.
+MANAGER_STARTUP="custom_nodes/ComfyUI-Manager/__manager/startup-scripts"
+mkdir -p "$MANAGER_STARTUP"
+if [ -f "puget_merge_startup.py" ]; then
+    cp puget_merge_startup.py "$MANAGER_STARTUP/puget_merge_startup.py"
+    chmod 777 "$MANAGER_STARTUP/puget_merge_startup.py"
 fi
+chmod -R 777 "custom_nodes/ComfyUI-Manager/__manager" 2>/dev/null || true
 
 # --- GPU Detection ---
 echo ""

@@ -369,10 +369,14 @@ case $FLAVOR in
         # Ensure Manager directory is writable by container (UID mismatch)
         chmod -R 777 "$INSTALL_DIR/custom_nodes/ComfyUI-Manager" 2>/dev/null || true
 
-        # Merge Puget template models into Manager's model list
-        if [ -f "$INSTALL_DIR/puget-models.json" ] && [ -f "$INSTALL_DIR/custom_nodes/ComfyUI-Manager/model-list.json" ]; then
-            python3 "$INSTALL_DIR/merge_puget_models.py" "$INSTALL_DIR/puget-models.json" "$INSTALL_DIR/custom_nodes/ComfyUI-Manager/model-list.json" 2>/dev/null || true
+        # Install Puget model merge as a Manager startup script
+        MANAGER_STARTUP="$INSTALL_DIR/custom_nodes/ComfyUI-Manager/__manager/startup-scripts"
+        mkdir -p "$MANAGER_STARTUP"
+        if [ -f "$INSTALL_DIR/puget_merge_startup.py" ]; then
+            cp "$INSTALL_DIR/puget_merge_startup.py" "$MANAGER_STARTUP/puget_merge_startup.py"
+            chmod 777 "$MANAGER_STARTUP/puget_merge_startup.py"
         fi
+        chmod -R 777 "$INSTALL_DIR/custom_nodes/ComfyUI-Manager/__manager" 2>/dev/null || true
 
         # GPU Detection for VRAM gating
         echo ""

@@ -135,6 +135,5 @@ scripts/update_checksum.sh
 │   └── lib/                   # Shared installer helpers
 ├── .githooks/
 │   └── pre-commit             # Auto-updates checksum on commit
-├── SOP_AI_PRELOAD_v0.5.0.md   # Puget Systems internal SOP
 └── README.md
 ```

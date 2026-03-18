@@ -67,11 +67,32 @@ fi
 tar -xzf "$ARCHIVE_PATH" -C "$TEMP_DIR"
 echo -e "${GREEN}Assets acquired.${NC}"
 
-# 4. Handover to Main Installer
+# 3.5. Integrity Check (MD5)
 # GitHub archives extract to <repo>-<branch>/ directory
 # Note: GitHub sanitizes branch names in archives (e.g. feature/foo -> feature-foo)
 # For simple branches (main, develop) this is 1:1.
-INSTALLER_PATH="$TEMP_DIR/${PROJECT_NAME}-${BRANCH}/install.sh"
+EXTRACT_DIR="$TEMP_DIR/${PROJECT_NAME}-${BRANCH}"
+CHECKSUM_FILE="$EXTRACT_DIR/install.sh.md5"
+
+if [ -f "$CHECKSUM_FILE" ]; then
+    echo -e "${BLUE}Verifying installer integrity...${NC}"
+    EXPECTED_HASH=$(awk '{print $1}' "$CHECKSUM_FILE")
+    ACTUAL_HASH=$(md5sum "$EXTRACT_DIR/install.sh" | awk '{print $1}')
+    if [ "$EXPECTED_HASH" != "$ACTUAL_HASH" ]; then
+        echo -e "${RED}✗ Integrity check FAILED.${NC}"
+        echo -e "  Expected MD5: ${EXPECTED_HASH}"
+        echo -e "  Got MD5:      ${ACTUAL_HASH}"
+        echo -e "  The installer may be corrupted or tampered with."
+        echo -e "  If you just updated install.sh, run: ${BLUE}scripts/update_checksum.sh${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}✓ Installer integrity verified (MD5).${NC}"
+else
+    echo -e "${YELLOW}⚠ No checksum file found — skipping integrity check.${NC}"
+fi
+
+# 4. Handover to Main Installer
+INSTALLER_PATH="$EXTRACT_DIR/install.sh"
 chmod +x "$INSTALLER_PATH"
 
 echo -e "${BLUE}Launching Installer...${NC}"

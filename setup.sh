@@ -68,10 +68,13 @@ tar -xzf "$ARCHIVE_PATH" -C "$TEMP_DIR"
 echo -e "${GREEN}Assets acquired.${NC}"
 
 # 3.5. Integrity Check (MD5)
-# GitHub archives extract to <repo>-<branch>/ directory
-# Note: GitHub sanitizes branch names in archives (e.g. feature/foo -> feature-foo)
-# For simple branches (main, develop) this is 1:1.
-EXTRACT_DIR="$TEMP_DIR/${PROJECT_NAME}-${BRANCH}"
+# GitHub archives extract to <repo>-<branch>/ — auto-detect the directory
+# to handle repo renames or branch name sanitization.
+EXTRACT_DIR=$(find "$TEMP_DIR" -mindepth 1 -maxdepth 1 -type d | head -1)
+if [ -z "$EXTRACT_DIR" ]; then
+    echo -e "${RED}Error: Archive extraction failed — no directory found.${NC}"
+    exit 1
+fi
 CHECKSUM_FILE="$EXTRACT_DIR/install.sh.md5"
 
 if [ -f "$CHECKSUM_FILE" ]; then

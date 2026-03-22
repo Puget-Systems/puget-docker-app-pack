@@ -734,15 +734,15 @@ if [[ "$START_NOW" != "n" && "$START_NOW" != "N" ]]; then
     fi
 
     # Smart rebuild: detect if build files changed → --no-cache rebuild
-    smart_build
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Build failed. Cannot start container.${NC}"
-        cd - > /dev/null
-        exit 1
+    BUILD_OK=true
+    if ! smart_build; then
+        echo -e "${RED}Build failed. Attempting to start with existing images...${NC}"
+        BUILD_OK=false
     fi
-    docker compose up -d
+    COMPOSE_EXIT=0
+    docker compose up -d || COMPOSE_EXIT=$?
     
-    if [ $? -eq 0 ]; then
+    if [ $COMPOSE_EXIT -eq 0 ]; then
         echo -e "${GREEN}✓ Container started successfully!${NC}"
         
         # Show access URL based on flavor

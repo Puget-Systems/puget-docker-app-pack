@@ -32,8 +32,15 @@ show_vllm_model_menu() {
         echo -e "  5) DeepSeek R1 (70B AWQ)      - ${RED}Requires ~40 GB VRAM${NC}"
     fi
 
-    echo "  6) Custom                      - Enter a HuggingFace model ID"
-    echo "  7) Skip                        - I'll configure via .env later"
+    echo "  6) Nemotron 3 Nano (30B MoE)   - 3B active, long context (~20 GB NVFP4)"
+    if [ "$TOTAL_VRAM" -ge 80 ]; then
+        echo "  7) Nemotron 3 Super (120B MoE) - 12B active, flagship (~60 GB NVFP4)"
+    else
+        echo -e "  7) Nemotron 3 Super (120B MoE) - ${RED}Requires ~80 GB VRAM (you have ${TOTAL_VRAM} GB)${NC}"
+    fi
+
+    echo "  8) Custom                      - Enter a HuggingFace model ID"
+    echo "  9) Skip                        - I'll configure via .env later"
 }
 
 # select_vllm_model <choice>
@@ -96,6 +103,22 @@ select_vllm_model() {
             VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser hermes"
             ;;
         6)
+            VLLM_MODEL_ID="nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-NVFP4"; VLLM_GPU_COUNT=1; VLLM_MODEL_SIZE_GB=20
+            VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser nemotron_json"
+            VLLM_REASONING_ARGS="--reasoning-parser nano_v3"
+            VLLM_IMAGE="${NIGHTLY_PREFIX}"
+            ;;
+        7)
+            if [ "$TOTAL_VRAM" -lt 80 ]; then
+                echo -e "${RED}✗ Nemotron 3 Super NVFP4 requires ~80 GB VRAM (you have ${TOTAL_VRAM} GB).${NC}"
+                return 1
+            fi
+            VLLM_MODEL_ID="nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4"; VLLM_MODEL_SIZE_GB=60
+            VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser nemotron_json"
+            VLLM_REASONING_ARGS="--reasoning-parser nano_v3"
+            VLLM_IMAGE="${NIGHTLY_PREFIX}"
+            ;;
+        8)
             read -p "  Enter HuggingFace model ID: " VLLM_MODEL_ID
             return 2
             ;;
@@ -127,7 +150,7 @@ select_vllm_model() {
     #   weight_pct 50-69% → moderate, cap to 24576
     #   weight_pct >= 70% → tight (already capped to 16384/8192 above)
     case "$VLLM_MODEL_ID" in
-        cyankiwi/Qwen3.5-*)
+        cyankiwi/Qwen3.5-*|nvidia/NVIDIA-Nemotron-3-*)
             local weight_pct_moe=$((VLLM_MODEL_SIZE_GB * 100 / available_vram))
             if [ "$weight_pct_moe" -ge 50 ] && [ "$VLLM_MAX_CTX" -gt 24576 ]; then
                 VLLM_MAX_CTX=24576

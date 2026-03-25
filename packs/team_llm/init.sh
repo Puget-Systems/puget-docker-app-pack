@@ -53,7 +53,7 @@ echo "  Available models (based on ${TOTAL_VRAM} GB total VRAM):"
 echo ""
 show_vllm_model_menu
 echo ""
-read -p "Select [1-7]: " CHOICE
+read -p "Select [1-9]: " CHOICE
 
 if ! select_vllm_model "$CHOICE"; then
     if [ -z "$VLLM_MODEL_ID" ]; then

@@ -86,7 +86,7 @@ VLLM_IMAGE=${VLLM_IMAGE}
 # Number of GPUs for tensor parallelism
 GPU_COUNT=${VLLM_GPU_COUNT}
 
-# Maximum context length (tokens)
+# Maximum context length (empty = vLLM auto-detects from available VRAM)
 MAX_CONTEXT=${VLLM_MAX_CTX}
 
 # GPU memory utilization (0.0-1.0, auto-tuned for ${VLLM_MODEL_SIZE_GB}GB model on $((VRAM_GB * VLLM_GPU_COUNT))GB VRAM)
@@ -117,7 +117,7 @@ echo -e "${GREEN}✓ Configuration written to .env${NC}"
 echo ""
 echo "  Model:    $VLLM_MODEL_ID"
 echo "  GPUs:     $VLLM_GPU_COUNT"
-echo "  Context:  $VLLM_MAX_CTX tokens"
+echo "  Context:  ${VLLM_MAX_CTX:-auto (vLLM sizes from VRAM)}"
 echo "  Memory:   $VLLM_GPU_MEM_UTIL utilization"
 echo ""
 

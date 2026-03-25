@@ -129,36 +129,23 @@ select_vllm_model() {
             ;;
     esac
 
-    # --- Auto-tune GPU memory based on model size vs available VRAM ---
+    # --- Auto-tune GPU memory utilization based on model size vs available VRAM ---
     local available_vram=$((VRAM_GB * VLLM_GPU_COUNT))
     VLLM_GPU_MEM_UTIL="0.90"
-    VLLM_MAX_CTX=32768
+    # Leave MAX_CONTEXT empty to let vLLM auto-detect the maximum context
+    # length based on available VRAM after model loading. This avoids the
+    # previous conservative caps (8K/16K/24K/32K) that left VRAM unused.
+    VLLM_MAX_CTX=""
 
     if [ "$VLLM_MODEL_SIZE_GB" -gt 0 ] 2>/dev/null; then
         local weight_pct=$((VLLM_MODEL_SIZE_GB * 100 / available_vram))
 
         if [ "$weight_pct" -ge 85 ]; then
             VLLM_GPU_MEM_UTIL="0.95"
-            VLLM_MAX_CTX=8192
         elif [ "$weight_pct" -ge 70 ]; then
             VLLM_GPU_MEM_UTIL="0.92"
-            VLLM_MAX_CTX=16384
         fi
     fi
-
-    # Qwen 3.5 MoE: hybrid GDN+attention uses more KV cache per token than
-    # pure attention. Cap context based on available headroom:
-    #   weight_pct < 50%  → comfortable headroom, allow 32768
-    #   weight_pct 50-69% → moderate, cap to 24576
-    #   weight_pct >= 70% → tight (already capped to 16384/8192 above)
-    case "$VLLM_MODEL_ID" in
-        cyankiwi/Qwen3.5-*|nvidia/NVIDIA-Nemotron-3-*)
-            local weight_pct_moe=$((VLLM_MODEL_SIZE_GB * 100 / available_vram))
-            if [ "$weight_pct_moe" -ge 50 ] && [ "$VLLM_MAX_CTX" -gt 24576 ]; then
-                VLLM_MAX_CTX=24576
-            fi
-            ;;
-    esac
 
     return 0
 }

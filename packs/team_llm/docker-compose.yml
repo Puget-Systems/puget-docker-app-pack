@@ -29,7 +29,7 @@ services:
         exec python3 -m vllm.entrypoints.openai.api_server
         --model=${MODEL_ID:-Qwen/Qwen3-32B}
         --tensor-parallel-size=${GPU_COUNT:-1}
-        --max-model-len=${MAX_CONTEXT:-32768}
+        ${MAX_CONTEXT:+--max-model-len=${MAX_CONTEXT}}
         --gpu-memory-utilization=${GPU_MEMORY_UTILIZATION:-0.90}
         --max-num-seqs=32
         --dtype=${DTYPE:-auto}
@@ -41,7 +41,7 @@ services:
 
   # 2. User Interface (Open WebUI)
   ui:
-    image: ghcr.io/open-webui/open-webui:main
+    image: ghcr.io/open-webui/open-webui:v0.8.10
     container_name: puget_team_webui
     restart: unless-stopped
     ports:

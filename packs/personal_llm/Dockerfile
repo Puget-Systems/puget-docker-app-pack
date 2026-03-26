@@ -1,6 +1,6 @@
-# Base Image: Python 3.11 Slim (Standard for Agentic Frameworks)
+# Base Image: Python 3.12 Slim (Standard for Agentic Frameworks)
 # Keeping it slim but capable
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Prevent interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive

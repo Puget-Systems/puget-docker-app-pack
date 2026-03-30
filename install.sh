@@ -767,9 +767,10 @@ if [[ "$START_NOW" != "n" && "$START_NOW" != "N" ]]; then
                 echo "  2) Qwen 3 (32B)        - Best Quality, Single GPU (~20 GB) [Recommended]"
                 echo "  3) DeepSeek R1 (70B)   - Flagship Reasoning, Dual GPU (~42 GB)"
                 echo "  4) Llama 4 Scout       - Multimodal (text+image), Dual GPU (~63 GB)"
-                echo "  5) Skip                - I'll download models later"
+                echo "  5) Nemotron Nano (30B)  - NVIDIA MoE Reasoning, Single GPU (~24 GB)"
+                echo "  6) Skip                - I'll download models later"
                 echo ""
-                read -p "Select a model [1-5]: " MODEL_SELECT
+                read -p "Select a model [1-6]: " MODEL_SELECT
                 
                 MODEL_TAG=""
                 case $MODEL_SELECT in
@@ -777,6 +778,7 @@ if [[ "$START_NOW" != "n" && "$START_NOW" != "N" ]]; then
                     2) MODEL_TAG="qwen3:32b" ;;
                     3) MODEL_TAG="deepseek-r1:70b" ;;
                     4) MODEL_TAG="llama4:scout" ;;
+                    5) MODEL_TAG="nemotron-3-nano:30b" ;;
                     *) echo "Skipping model download." ;;
                 esac
 

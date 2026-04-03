@@ -17,6 +17,7 @@ source "$INSTALLER_DIR/scripts/lib/gpu_detect.sh"
 source "$INSTALLER_DIR/scripts/lib/smart_build.sh"
 source "$INSTALLER_DIR/scripts/lib/vllm_monitor.sh"
 source "$INSTALLER_DIR/scripts/lib/vllm_model_select.sh"
+source "$INSTALLER_DIR/scripts/lib/ollama_model_select.sh"
 
 echo -e "${BLUE}============================================================${NC}"
 echo -e "${BLUE}   Puget Systems Docker App Pack - Universal Installer${NC}"
@@ -623,8 +624,6 @@ case $FLAVOR in
         ;;
     personal_llm)
         echo -e "${GREEN}Personal LLM (Ollama + Open WebUI)${NC}"
-        echo "Note: You will be prompted to download models after the container launches."
-        echo "      (Or use ./init.sh at any time)"
         echo ""
         # Cache Proxy Configuration (optional)
         echo -e "${YELLOW}Cache Proxy (Optional):${NC}"
@@ -634,6 +633,20 @@ case $FLAVOR in
         if [ -n "$CACHE_URL" ]; then
             echo "CACHE_PROXY=$CACHE_URL" >> "$INSTALL_DIR/.env"
             echo -e "${GREEN}✓ Cache proxy configured: $CACHE_URL${NC}"
+        fi
+        echo ""
+        # GPU Detection
+        echo -e "${YELLOW}GPU Configuration:${NC}"
+        if detect_gpus; then
+            echo -e "${GREEN}  ✓ Found ${GPU_COUNT}x ${GPU_NAME} (${VRAM_GB} GB each, ${TOTAL_VRAM} GB total)${NC}"
+            if [ "$IS_BLACKWELL" = true ]; then
+                echo -e "${GREEN}    Blackwell GPU detected (compute ${COMPUTE_CAP})${NC}"
+            fi
+        else
+            GPU_COUNT=1
+            TOTAL_VRAM=0
+            VRAM_GB=0
+            echo -e "${YELLOW}  ⚠ nvidia-smi not found, cannot detect VRAM.${NC}"
         fi
         ;;
     team_llm)
@@ -763,43 +776,46 @@ if [[ "$START_NOW" != "n" && "$START_NOW" != "N" ]]; then
                 echo -e "  Network: ${BLUE}http://${LOCAL_IP}:3000${NC}"
                 echo ""
                 echo "Select a starter model to download:"
-                echo "  1) Qwen 3 (8B)           - Fast, Low VRAM (~5 GB)"
-                echo "  2) Qwen 3 (32B)          - Best Quality, Single GPU (~20 GB) [Recommended]"
-                echo "  3) DeepSeek R1 (70B)     - Flagship Reasoning, Dual GPU (~42 GB)"
-                echo "  4) Llama 4 Scout         - Multimodal (text+image), Dual GPU (~63 GB)"
-                echo "  5) Nemotron 3 Nano (30B) - NVIDIA MoE Reasoning, Single GPU (~24 GB)"
-                echo "  6) Nemotron 3 Super      - NVIDIA Flagship MoE, Multi-GPU (~96 GB)"
-                echo "  7) Skip                  - I'll download models later"
+                echo ""
+                show_ollama_model_menu
                 echo ""
                 read -p "Select a model [1-7]: " MODEL_SELECT
-                
+
                 MODEL_TAG=""
-                case $MODEL_SELECT in
-                    1) MODEL_TAG="qwen3:8b" ;;
-                    2) MODEL_TAG="qwen3:32b" ;;
-                    3) MODEL_TAG="deepseek-r1:70b" ;;
-                    4) MODEL_TAG="llama4:scout" ;;
-                    5) MODEL_TAG="nemotron-3-nano:30b" ;;
-                    6) MODEL_TAG="nemotron-3-super" ;;
-                    *) echo "Skipping model download." ;;
-                esac
+                OLLAMA_SELECT_RC=0
+                select_ollama_model "$MODEL_SELECT" || OLLAMA_SELECT_RC=$?
+
+                if [ $OLLAMA_SELECT_RC -eq 0 ]; then
+                    MODEL_TAG="$OLLAMA_MODEL_TAG"
+                elif [ $OLLAMA_SELECT_RC -eq 1 ]; then
+                    # VRAM insufficient — message already printed
+                    MODEL_TAG=""
+                else
+                    echo "Skipping model download."
+                    MODEL_TAG=""
+                fi
 
                 if [[ -n "$MODEL_TAG" ]]; then
-                     # Wait for Ollama server to be ready before pulling
-                     echo -e "${BLUE}Waiting for Ollama server to be ready...${NC}"
-                     for i in $(seq 1 30); do
+                     # Wait for Ollama server to be ready (may take 60s+ on cold start)
+                     echo -n "Waiting for Ollama server to be ready"
+                     OLLAMA_READY=false
+                     for i in $(seq 1 120); do
                          if docker compose exec inference ollama list &>/dev/null; then
+                             OLLAMA_READY=true
+                             echo ""
                              echo -e "${GREEN}✓ Ollama server is ready.${NC}"
                              break
                          fi
-                         if [ "$i" -eq 30 ]; then
-                             echo -e "${RED}✗ Ollama server did not become ready in time.${NC}"
-                             echo "  Try running: docker compose exec inference ollama pull $MODEL_TAG"
-                             MODEL_TAG=""
-                             break
-                         fi
+                         echo -n "."
                          sleep 1
                      done
+
+                     if [ "$OLLAMA_READY" = false ]; then
+                         echo ""
+                         echo -e "${RED}✗ Ollama server did not become ready after 120 seconds.${NC}"
+                         echo "  Check: docker compose logs inference"
+                         MODEL_TAG=""
+                     fi
                 fi
 
                 if [[ -n "$MODEL_TAG" ]]; then

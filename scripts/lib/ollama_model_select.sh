@@ -79,5 +79,20 @@ select_ollama_model() {
         return 1
     fi
 
+    # Multi-GPU warning: Ollama uses pipeline parallelism (layer splitting)
+    # which is significantly slower than tensor parallelism (vLLM).
+    if [ "$GPU_COUNT" -gt 1 ] && [ "$OLLAMA_MODEL_VRAM_GB" -gt "$VRAM_GB" ]; then
+        echo ""
+        echo -e "${YELLOW}⚠ WARNING: ${OLLAMA_MODEL_TAG} (~${OLLAMA_MODEL_VRAM_GB} GB) exceeds single GPU capacity (${VRAM_GB} GB).${NC}"
+        echo -e "  Ollama will split layers across GPUs, which is ${RED}significantly slower${NC}"
+        echo -e "  than single-GPU inference. For multi-GPU workloads, the ${BLUE}Team LLM${NC}"
+        echo -e "  pack (vLLM) provides tensor parallelism with much better performance."
+        echo ""
+        read -p "  Continue anyway? (y/N): " CONTINUE
+        if [[ "$CONTINUE" != "y" && "$CONTINUE" != "Y" ]]; then
+            return 2
+        fi
+    fi
+
     return 0
 }

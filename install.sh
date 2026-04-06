@@ -682,7 +682,7 @@ case $FLAVOR in
         echo ""
         show_vllm_model_menu
         echo ""
-        read -p "Select [1-7]: " VLLM_MODEL_SELECT
+        read -p "Select [1-10]: " VLLM_MODEL_SELECT
 
         if select_vllm_model "$VLLM_MODEL_SELECT"; then
             echo "MODEL_ID=$VLLM_MODEL_ID" >> "$INSTALL_DIR/.env"
@@ -697,7 +697,7 @@ case $FLAVOR in
             echo "EXTRA_VLLM_ARGS=$VLLM_EXTRA_ARGS" >> "$INSTALL_DIR/.env"
             echo "DTYPE=$VLLM_DTYPE" >> "$INSTALL_DIR/.env"
             echo -e "${GREEN}✓ Model: $VLLM_MODEL_ID (${VLLM_GPU_COUNT} GPU(s))${NC}"
-            local ctx_display=${VLLM_MAX_CTX:-auto (vLLM will size based on available VRAM)}
+            ctx_display=${VLLM_MAX_CTX:-auto (vLLM will size based on available VRAM)}
             echo -e "  Memory: ${VLLM_GPU_MEM_UTIL} utilization, ${ctx_display} context"
             PARSER_NAME=$(echo "$VLLM_TOOL_CALL_ARGS" | grep -oE 'tool-call-parser [^ ]+' | awk '{print $2}' || echo "hermes")
             echo -e "  Tool calls: enabled ($PARSER_NAME parser)"

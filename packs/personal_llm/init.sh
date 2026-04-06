@@ -69,7 +69,7 @@ echo "  Available models (based on ${TOTAL_VRAM} GB total VRAM):"
 echo ""
 show_ollama_model_menu
 echo ""
-read -p "Select [1-7]: " CHOICE
+read -p "Select [1-8]: " CHOICE
 
 SELECT_RC=0
 select_ollama_model "$CHOICE" || SELECT_RC=$?
@@ -90,7 +90,7 @@ echo -e "${YELLOW}[3/3] Downloading ${OLLAMA_MODEL_TAG}...${NC}"
 echo -n "Waiting for Ollama server to be ready"
 OLLAMA_READY=false
 for i in $(seq 1 120); do
-    if docker compose exec inference ollama list &>/dev/null; then
+    if docker compose exec -T inference ollama list &>/dev/null; then
         OLLAMA_READY=true
         echo ""
         echo -e "${GREEN}✓ Ollama server is ready.${NC}"
@@ -108,7 +108,7 @@ if [ "$OLLAMA_READY" = false ]; then
 fi
 
 echo -e "${BLUE}Pulling ${OLLAMA_MODEL_TAG}... (This may take a while for larger models)${NC}"
-docker compose exec inference ollama pull "$OLLAMA_MODEL_TAG"
+docker compose exec -T inference ollama pull "$OLLAMA_MODEL_TAG"
 
 echo ""
 echo -e "${GREEN}✓ Model ready!${NC}"

@@ -39,8 +39,14 @@ show_vllm_model_menu() {
         echo -e "  7) Nemotron 3 Super (120B MoE) - ${RED}Requires ~80 GB VRAM (you have ${TOTAL_VRAM} GB)${NC}"
     fi
 
-    echo "  8) Custom                      - Enter a HuggingFace model ID"
-    echo "  9) Skip                        - I'll configure via .env later"
+    if [ "$TOTAL_VRAM" -ge 64 ]; then
+        echo "  8) Gemma 4 (31B BF16)          - Google Dense Instruct, Dual GPU (~62 GB)"
+    else
+        echo -e "  8) Gemma 4 (31B BF16)          - ${RED}Requires ~64 GB VRAM (you have ${TOTAL_VRAM} GB)${NC}"
+    fi
+
+    echo "  9) Custom                      - Enter a HuggingFace model ID"
+    echo " 10) Skip                        - I'll configure via .env later"
 }
 
 # select_vllm_model <choice>
@@ -121,6 +127,14 @@ select_vllm_model() {
             VLLM_IMAGE="${NIGHTLY_PREFIX}"
             ;;
         8)
+            if [ "$TOTAL_VRAM" -lt 64 ]; then
+                echo -e "${RED}✗ Gemma 4 31B BF16 requires ~64 GB VRAM (you have ${TOTAL_VRAM} GB).${NC}"
+                return 1
+            fi
+            VLLM_MODEL_ID="google/gemma-4-31B-it"; VLLM_MODEL_SIZE_GB=62
+            VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser functiongemma"
+            ;;
+        9)
             read -p "  Enter HuggingFace model ID: " VLLM_MODEL_ID
             return 2
             ;;

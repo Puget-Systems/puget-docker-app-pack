@@ -43,7 +43,13 @@ show_ollama_model_menu() {
         echo -e "  6) Nemotron 3 Super      - ${RED}Requires ~96 GB VRAM (you have ${TOTAL_VRAM} GB)${NC}"
     fi
 
-    echo "  7) Skip                  - I'll download models later"
+    if [ "$TOTAL_VRAM" -ge 20 ]; then
+        echo "  7) Gemma 4 (31B)         - Google, Dense Instruct, Single GPU (~20 GB)"
+    else
+        echo -e "  7) Gemma 4 (31B)         - ${RED}Requires ~20 GB VRAM (you have ${TOTAL_VRAM} GB)${NC}"
+    fi
+
+    echo "  8) Skip                  - I'll download models later"
 }
 
 # select_ollama_model <choice>
@@ -62,6 +68,7 @@ select_ollama_model() {
         4) OLLAMA_MODEL_TAG="llama4:scout";        OLLAMA_MODEL_VRAM_GB=63 ;;
         5) OLLAMA_MODEL_TAG="nemotron-3-nano:30b"; OLLAMA_MODEL_VRAM_GB=24 ;;
         6) OLLAMA_MODEL_TAG="nemotron-3-super";    OLLAMA_MODEL_VRAM_GB=96 ;;
+        7) OLLAMA_MODEL_TAG="gemma4:31b";          OLLAMA_MODEL_VRAM_GB=20 ;;
         *) return 2 ;;
     esac
 

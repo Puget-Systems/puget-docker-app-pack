@@ -338,11 +338,9 @@ cp -r "$PACKS_DIR/$FLAVOR/." "$INSTALL_DIR/"
 mkdir -p "$INSTALL_DIR/scripts/lib"
 cp "$INSTALLER_DIR/scripts/lib/"*.sh "$INSTALL_DIR/scripts/lib/"
 
-# Create standard .env if it doesn't exist
-if [ ! -f "$INSTALL_DIR/.env" ]; then
-    echo "Creating default .env..."
-    echo "PUGET_APP_NAME=$INSTALL_DIR" > "$INSTALL_DIR/.env"
-fi
+# Reset .env to a clean state on each install/re-install
+# This prevents duplicate entries from stacking on re-runs
+echo "PUGET_APP_NAME=$INSTALL_DIR" > "$INSTALL_DIR/.env"
 
 echo -e "${GREEN}Success! Application installed to '$INSTALL_DIR'.${NC}"
 
@@ -629,11 +627,19 @@ case $FLAVOR in
         echo -e "${YELLOW}Cache Proxy (Optional):${NC}"
         echo "  If this system is on a LAN with a Puget cache proxy (Squid),"
         echo "  model downloads can be cached to avoid re-downloading."
-        read -p "  Enter cache proxy URL (or press Enter to skip): " CACHE_URL
-        if [ -n "$CACHE_URL" ]; then
-            echo "CACHE_PROXY=$CACHE_URL" >> "$INSTALL_DIR/.env"
-            echo -e "${GREEN}✓ Cache proxy configured: $CACHE_URL${NC}"
-        fi
+        echo "  Example: http://172.19.168.179:3128"
+        while true; do
+            read -p "  Enter cache proxy URL (or press Enter to skip): " CACHE_URL
+            if [ -z "$CACHE_URL" ]; then
+                break
+            elif echo "$CACHE_URL" | grep -qE '^https?://[a-zA-Z0-9._-]+(:[0-9]+)?/?$'; then
+                echo "CACHE_PROXY=$CACHE_URL" >> "$INSTALL_DIR/.env"
+                echo -e "${GREEN}✓ Cache proxy configured: $CACHE_URL${NC}"
+                break
+            else
+                echo -e "${RED}  ✗ Invalid URL format. Must be http://host:port (e.g. http://172.19.168.179:3128)${NC}"
+            fi
+        done
         echo ""
         # GPU Detection
         echo -e "${YELLOW}GPU Configuration:${NC}"
@@ -657,11 +663,19 @@ case $FLAVOR in
         echo -e "${YELLOW}Cache Proxy (Optional):${NC}"
         echo "  If this system is on a LAN with a Puget cache proxy (Squid),"
         echo "  model downloads can be cached to avoid re-downloading."
-        read -p "  Enter cache proxy URL (or press Enter to skip): " CACHE_URL
-        if [ -n "$CACHE_URL" ]; then
-            echo "CACHE_PROXY=$CACHE_URL" >> "$INSTALL_DIR/.env"
-            echo -e "${GREEN}✓ Cache proxy configured: $CACHE_URL${NC}"
-        fi
+        echo "  Example: http://172.19.168.179:3128"
+        while true; do
+            read -p "  Enter cache proxy URL (or press Enter to skip): " CACHE_URL
+            if [ -z "$CACHE_URL" ]; then
+                break
+            elif echo "$CACHE_URL" | grep -qE '^https?://[a-zA-Z0-9._-]+(:[0-9]+)?/?$'; then
+                echo "CACHE_PROXY=$CACHE_URL" >> "$INSTALL_DIR/.env"
+                echo -e "${GREEN}✓ Cache proxy configured: $CACHE_URL${NC}"
+                break
+            else
+                echo -e "${RED}  ✗ Invalid URL format. Must be http://host:port (e.g. http://172.19.168.179:3128)${NC}"
+            fi
+        done
         echo ""
         # GPU Detection
         echo -e "${YELLOW}GPU Configuration:${NC}"

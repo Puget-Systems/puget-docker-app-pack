@@ -15,9 +15,8 @@ ARG VLLM_BASE_IMAGE=vllm/vllm-openai:latest
 FROM ${VLLM_BASE_IMAGE}
 
 # --- Upgrade transformers (build-time, not runtime) ---
-# Pinned to a known-good stable tag. Update intentionally with PR review.
-ARG TRANSFORMERS_VERSION=v5.5.4
-RUN pip install --no-cache-dir \
-    "git+https://github.com/huggingface/transformers.git@${TRANSFORMERS_VERSION}"
+# Install from PyPI — the base vLLM image has no git binary so git+https
+# installs fail. PyPI 5.5.* == the v5.5.4 tag on GitHub.
+RUN pip install --no-cache-dir "transformers>=5.5.4,<5.6.0"
 
 # Entrypoint/CMD are inherited from the base vLLM image unchanged.

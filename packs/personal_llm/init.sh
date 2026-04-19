@@ -51,7 +51,8 @@ fi
 
 # --- Cache Proxy Status ---
 if [ -f .env ]; then
-    source .env 2>/dev/null || true
+    # Safe key extraction — only read known keys, never execute .env as code
+    CACHE_PROXY=$(grep '^CACHE_PROXY=' .env 2>/dev/null | tail -1 | cut -d= -f2- || true)
 fi
 
 if [ -n "${CACHE_PROXY:-}" ]; then

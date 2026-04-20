@@ -1,7 +1,7 @@
 services:
   # 1. Inference Engine
   inference:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.21.0
     container_name: puget_ollama
     restart: unless-stopped
     deploy:
@@ -29,7 +29,7 @@ services:
 
   # 2. User Interface
   ui:
-    image: ghcr.io/open-webui/open-webui:v0.8.10
+    image: ghcr.io/open-webui/open-webui:v0.8.12
     container_name: puget_personal_webui
     restart: unless-stopped
     ports:

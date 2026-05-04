@@ -216,14 +216,17 @@ else
 fi
 
 # Check for NVIDIA Container Toolkit (required for GPU access)
-if ! dpkg -l nvidia-container-toolkit &> /dev/null 2>&1; then
+# Use `command -v nvidia-ctk` — dpkg -l can falsely report packages as present
+# when they are in a "desired but not installed" (un) state.
+if ! command -v nvidia-ctk &> /dev/null; then
     echo -e "${RED}✗ NVIDIA Container Toolkit is not installed.${NC}"
-    echo "  This is required for GPU passthrough to containers."
+    echo "  This is required for Docker to access NVIDIA GPUs."
     read -p "  Would you like to install NVIDIA Container Toolkit now? (Y/n): " INSTALL_NVIDIA
     if [[ "$INSTALL_NVIDIA" != "n" && "$INSTALL_NVIDIA" != "N" ]]; then
         echo -e "${BLUE}Installing NVIDIA Container Toolkit...${NC}"
-        # Add NVIDIA repo
-        curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+        # Add NVIDIA repo (--yes allows re-runs without "file already exists" error)
+        curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+            sudo gpg --yes --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
         curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
             sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
             sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
@@ -232,6 +235,31 @@ if ! dpkg -l nvidia-container-toolkit &> /dev/null 2>&1; then
     fi
 else
     echo -e "${GREEN}✓ NVIDIA Container Toolkit found.${NC}"
+fi
+
+# Hard gate: GPU stacks CANNOT work without the Container Toolkit.
+# Fail early with a clear message instead of a cryptic Docker error at launch.
+if ! command -v nvidia-ctk &> /dev/null; then
+    echo ""
+    echo -e "${RED}════════════════════════════════════════════════════════════${NC}"
+    echo -e "${RED}✗ NVIDIA Container Toolkit is required but not installed.${NC}"
+    echo -e "${RED}════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo "  Without it, Docker cannot access NVIDIA GPUs and GPU-accelerated"
+    echo "  containers (Ollama, vLLM, ComfyUI) will fail to start with:"
+    echo ""
+    echo -e "  ${YELLOW}could not select device driver \"nvidia\" with capabilities: [[gpu]]${NC}"
+    echo ""
+    echo "  Install manually with:"
+    echo -e "  ${BLUE}curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \\"
+    echo -e "    sudo gpg --yes --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg"
+    echo -e "  curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \\"
+    echo -e "    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \\"
+    echo -e "    sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list"
+    echo -e "  sudo apt update && sudo apt install -y nvidia-container-toolkit${NC}"
+    echo ""
+    echo "  Then re-run this installer."
+    exit 1
 fi
 
 # ALWAYS ensure Docker runtime is configured for NVIDIA (even if toolkit was pre-installed)

@@ -262,34 +262,56 @@ if ! command -v nvidia-ctk &> /dev/null; then
     exit 1
 fi
 
-# ALWAYS ensure Docker runtime is configured for NVIDIA (even if toolkit was pre-installed)
+# ALWAYS configure Docker for NVIDIA GPU access.
+# nvidia-ctk runtime configure is idempotent — safe to run every time.
+# We run it unconditionally because `docker info | grep nvidia` can false-positive
+# on the GPU device name (e.g. "NVIDIA GeForce RTX 5090") even when the runtime
+# is NOT actually registered.
 if command -v nvidia-ctk &> /dev/null && command -v docker &> /dev/null; then
-    # Check if nvidia runtime is configured in Docker
-    if ! docker info 2>/dev/null | grep -q "nvidia"; then
-        echo -e "${BLUE}Configuring Docker for NVIDIA GPU access...${NC}"
-        sudo nvidia-ctk runtime configure --runtime=docker
-        sudo systemctl restart docker
-        
-        # Wait for Docker to restart
-        echo "Waiting for Docker to restart..."
-        for i in {1..10}; do
-            if docker info &> /dev/null; then
-                break
-            fi
-            sleep 1
-        done
-        
-        echo -e "${GREEN}✓ Docker GPU runtime configured.${NC}"
-    fi
+    echo -e "${BLUE}Configuring Docker for NVIDIA GPU access...${NC}"
+    sudo nvidia-ctk runtime configure --runtime=docker
+    sudo systemctl restart docker
 
-    # Verify generic GPU access
-    echo "Verifying GPU access in Docker (this may pull an image)..."
+    # Wait for Docker to restart
+    echo "Waiting for Docker to restart..."
+    for i in {1..15}; do
+        if docker info &> /dev/null 2>&1; then
+            break
+        fi
+        sleep 1
+    done
+
+    echo -e "${GREEN}✓ Docker GPU runtime configured.${NC}"
+
+    # Verify GPU access with a real container — this is the definitive test.
+    echo "Verifying GPU access in Docker (this may pull an image on first run)..."
     if docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi &> /dev/null; then
         echo -e "${GREEN}✓ GPU accessible from Docker.${NC}"
     else
-        echo -e "${YELLOW}⚠ Warning: GPU verification check did not pass.${NC}"
-        echo -e "${YELLOW}  This is common immediately after driver/toolkit installation.${NC}"
-        echo -e "${YELLOW}  If containers fail to detect the GPU, try: sudo reboot${NC}"
+        echo ""
+        echo -e "${RED}════════════════════════════════════════════════════════════${NC}"
+        echo -e "${RED}✗ Docker cannot access the NVIDIA GPU.${NC}"
+        echo -e "${RED}════════════════════════════════════════════════════════════${NC}"
+        echo ""
+        echo "  The NVIDIA driver works (nvidia-smi passed), and the Container"
+        echo "  Toolkit is installed, but Docker still cannot access the GPU."
+        echo ""
+        echo "  Common causes:"
+        echo -e "  1. ${YELLOW}Reboot required${NC} — the toolkit was just installed and the"
+        echo "     kernel modules need to be reloaded."
+        echo -e "     Fix: ${BLUE}sudo reboot${NC}, then re-run this installer."
+        echo ""
+        echo -e "  2. ${YELLOW}Toolkit/driver version mismatch${NC} — the container toolkit"
+        echo "     version may not support this driver."
+        echo -e "     Check: ${BLUE}nvidia-ctk --version${NC}"
+        echo -e "     Fix:   ${BLUE}sudo apt update && sudo apt install --reinstall nvidia-container-toolkit${NC}"
+        echo ""
+        echo -e "  3. ${YELLOW}Docker daemon config conflict${NC} — /etc/docker/daemon.json"
+        echo "     may have a conflicting configuration."
+        echo -e "     Check: ${BLUE}cat /etc/docker/daemon.json${NC}"
+        echo ""
+        echo "  After fixing, re-run this installer."
+        exit 1
     fi
 fi
 

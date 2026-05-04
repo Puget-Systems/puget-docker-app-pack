@@ -111,7 +111,7 @@ select_vllm_model() {
                 echo -e "${RED}✗ Qwen 3.6 27B Dense AWQ requires ~18 GB VRAM (you have ${TOTAL_VRAM} GB).${NC}"
                 return 1
             fi
-            VLLM_MODEL_ID="cyankiwi/Qwen3.6-27B-Instruct-AWQ-4bit"; VLLM_MODEL_SIZE_GB=18
+            VLLM_MODEL_ID="cyankiwi/Qwen3.6-27B-AWQ-INT4"; VLLM_MODEL_SIZE_GB=18
             VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser qwen3_coder"
             VLLM_REASONING_ARGS="--reasoning-parser qwen3"
             VLLM_EXTRA_ARGS="--language-model-only $EAGER_ARGS"

@@ -1,0 +1,39 @@
+# Dockerfile.xpu
+# Purpose: Support Intel Arc B70 hardware by using an Ubuntu 24.04 base
+#          and installing matching drivers from the kobuk-team PPA.
+#
+# Usage:
+#   Build:   docker build -f Dockerfile.xpu -t puget-vllm-xpu:b70 .
+#   Compose: Set VLLM_IMAGE=puget-vllm-xpu:b70 in your .env
+
+# We use the newest vLLM XPU image. If it's Noble, great. If it's Jammy, 
+# add-apt-repository will handle the PPA for the detected OS version.
+ARG VLLM_BASE_IMAGE=intel/vllm:0.17.0-xpu
+FROM ${VLLM_BASE_IMAGE}
+
+# Switch to root to install drivers
+USER root
+
+# 1. Install prerequisites for adding PPAs
+# 2. Add the kobuk-team PPA (contains the 26.09.x drivers for B70)
+# 3. Install matching userspace drivers
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        software-properties-common \
+        gpg-agent \
+        curl && \
+    add-apt-repository -y ppa:kobuk-team/intel-graphics && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        intel-opencl-icd \
+        libze-intel-gpu1 \
+        intel-level-zero-gpu && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set environment variables for XPU execution
+ENV VLLM_TARGET_DEVICE=xpu
+ENV ONEAPI_DEVICE_SELECTOR=level_zero:gpu
+ENV SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMAND_LISTS=1
+
+# Entrypoint/CMD inherited from base image

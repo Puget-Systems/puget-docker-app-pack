@@ -140,7 +140,7 @@ echo ""
 detect_gpus || true
 
 if [ "$GPU_VENDOR" == "intel" ]; then
-    echo -e "${GREEN}✓ Intel ARC GPU detected: $GPU_NAME ($GPU_COUNTx)${NC}"
+    echo -e "${GREEN}✓ Intel ARC GPU detected: $GPU_NAME (${GPU_COUNT}x)${NC}"
     echo -e "${BLUE}Checking Intel Compute Runtime...${NC}"
     
     if ! dpkg -l | grep -q "intel-level-zero-gpu"; then
@@ -148,7 +148,7 @@ if [ "$GPU_VENDOR" == "intel" ]; then
         read -p "  Would you like to install Intel Compute Runtime now? (Y/n): " INSTALL_INTEL
         if [[ "$INSTALL_INTEL" != "n" && "$INSTALL_INTEL" != "N" ]]; then
             sudo apt update
-            sudo apt install -y intel-opencl-icd intel-level-zero-gpu level-zero intel-media-va-driver-non-free clinfo
+            sudo apt install -y intel-opencl-icd libze-intel-gpu1 intel-media-va-driver-non-free clinfo
             echo -e "${GREEN}✓ Intel Compute Runtime installed.${NC}"
         else
             echo "  Skipping driver installation. GPU containers may fail to start."
@@ -766,6 +766,19 @@ case $FLAVOR in
             PARSER_NAME=$(echo "$VLLM_TOOL_CALL_ARGS" | grep -oE 'tool-call-parser [^ ]+' | awk '{print $2}' || echo "hermes")
             echo -e "  Tool calls: enabled ($PARSER_NAME parser)"
             echo -e "  The model will download on first launch."
+            
+            # --- Custom Build for Intel B70 ---
+            if [[ "$VLLM_IMAGE" == "puget-vllm-xpu:b70" ]]; then
+                echo ""
+                echo -e "${BLUE}Checking for custom Intel B70 container image...${NC}"
+                if [[ "$(docker images -q puget-vllm-xpu:b70 2> /dev/null)" == "" ]]; then
+                    echo -e "${YELLOW}Building puget-vllm-xpu:b70 (this may take 5-10 minutes)...${NC}"
+                    (cd "$INSTALL_DIR" && docker build -t puget-vllm-xpu:b70 -f Dockerfile.xpu .)
+                    echo -e "${GREEN}✓ Image built successfully.${NC}"
+                else
+                    echo -e "${GREEN}✓ Custom Intel B70 image already exists.${NC}"
+                fi
+            fi
         elif [ -n "$VLLM_MODEL_ID" ]; then
             # Custom model (return code 2) — write what we have
             write_env_var "MODEL_ID" "$VLLM_MODEL_ID" "$INSTALL_DIR/.env"

@@ -69,7 +69,11 @@ select_vllm_model() {
     VLLM_THINKING_ARGS=""
     VLLM_EXTRA_ARGS=""
     VLLM_DTYPE="float16"
-    VLLM_IMAGE="intel/vllm:xpu"
+    if [ "$GPU_VENDOR" == "intel" ]; then
+        VLLM_IMAGE="puget-vllm-xpu:b70"
+    else
+        VLLM_IMAGE="vllm/vllm-openai:latest"
+    fi
     VLLM_MAX_CTX=""
 
     case $choice in
@@ -110,7 +114,7 @@ select_vllm_model() {
             VLLM_MODEL_ID="cyankiwi/Qwen3.5-122B-A10B-GPTQ-Int4"; VLLM_MODEL_SIZE_GB=60
             VLLM_TOOL_CALL_ARGS="--enable-auto-tool-choice --tool-call-parser qwen3_coder"
             VLLM_REASONING_ARGS="--reasoning-parser qwen3"
-            VLLM_EXTRA_ARGS="--language-model-only $XPU_ARGS"
+            VLLM_EXTRA_ARGS="$XPU_ARGS"
             VLLM_MAX_CTX="65536"
             ;;
         5)
